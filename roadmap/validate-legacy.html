@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OPENCUR – legacy COBOL test-path validation</title>
+<style>
+  html, body { height:100%; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:#f7f8fa; color:#1f2328; display:flex; flex-direction:column; overflow:hidden; }
+  h1 { font-size:17px; margin:10px 16px 2px; }
+  p.sub { margin:0 16px 8px; color:#57606a; font-size:12px; }
+  #chips { flex:none; display:flex; flex-wrap:wrap; gap:7px; margin:0 16px 8px; }
+  #chips button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 12px; border:2px solid var(--c, #c9ced6); border-radius:16px; background:#fff; color:var(--c, #1f2328); cursor:pointer; transition:all .15s; }
+  #chips button:hover { background:var(--c); color:#fff; transform:translateY(-1px); }
+  #chips button.active { background:var(--c); color:#fff; box-shadow:0 3px 10px var(--c); }
+  #chips button.all { --c:#374151; }
+  #info { flex:none; margin:0 16px 6px; padding:7px 12px; font-size:12.5px; border-left:5px solid #c9ced6; background:#eef0f3; border-radius:4px; color:#374151; transition:all .2s; }
+  #info b { font-size:13px; margin-right:6px; }
+  #info div { margin-top:2px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; }
+  #info .tag { display:inline-block; font-family:inherit; font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:9px; color:#fff; background:#16a34a; margin-right:6px; }
+  #main { flex:1 1 auto; min-height:0; display:flex; gap:10px; padding:0 12px 10px; }
+  #wrap { flex:1 1 auto; min-width:0; }
+  #svg { width:100%; height:100%; display:block; }
+  #code { flex:none; width:480px; overflow:auto; background:#fff; border:1px solid #d8dce2; border-radius:6px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; }
+  #code h2 { position:sticky; top:0; margin:0; padding:6px 10px; font:700 11px -apple-system,"Segoe UI",sans-serif; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; }
+  .ln { display:flex; align-items:center; white-space:pre; padding:1px 8px 1px 0; border-left:4px solid transparent; color:#6b7280; transition:background .2s; }
+  .ln .no { flex:none; width:34px; text-align:right; color:#9aa1ab; margin-right:6px; }
+  .ln .st { flex:none; width:20px; text-align:center; font:800 9px -apple-system,sans-serif; }
+  .ln .st i { display:none; font-style:normal; color:#fff; border-radius:8px; padding:1px 5px; }
+  .ln.cmt { color:#8c959f; font-style:italic; }
+  .ln.mock { opacity:.45; }
+  .ln.on { color:#111; font-weight:600; }
+  .ln.on .st i { display:inline-block; }
+
+  .strand { fill:none; stroke-linecap:round; stroke:#cfd4db; stroke-width:1.5; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .dim .strand:not(.on) { opacity:.35; }
+  .strand.on { stroke-width:6; }
+  .flow { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-dasharray:1 13; opacity:0; pointer-events:none; }
+  .flow.on { opacity:.9; animation:flow 0.9s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-14; } }
+
+  .lvl { font-size:9px; fill:#57606a; font-weight:600; }
+  .node rect { fill:#fff; stroke:#cfd4db; stroke-width:1.5; transition:fill .25s, stroke .25s; }
+  .node text { fill:#6b7280; transition:fill .25s; }
+  .node .l1 { font-size:8.5px; font-weight:700; letter-spacing:.02em; }
+  .node .l2 { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:9.5px; }
+  .node.leaf { cursor:pointer; }
+  .node.leaf:hover rect { stroke:#6b7280; }
+  .dim .node:not(.on) { opacity:.45; }
+  .node.on rect { stroke-width:2.5; }
+  .node.on text { fill:#fff; }
+  .node.on .l1 { opacity:.85; }
+  .badge circle { fill:#fff; stroke-width:2; }
+  .badge text { font-size:8px; font-weight:800; text-anchor:middle; }
+  .badge { display:none; }
+  .node.on .badge { display:block; }
+  .nobadge .badge { display:none !important; }
+</style>
+</head>
+<body>
+<h1>OPENCUR.cbl – test-path validation tree</h1>
+<p class="sub">Tree is derived from <b>OPENCUR.cbl</b> (paragraph &rarr; condition &rarr; branch). Pick a test case from <b>OPENCUR_*-testdata.json</b> to light up the path it executes; numbered badges and the source panel show the order of execution (<code>pathlines</code>).</p>
+<div id="chips"></div>
+<div id="info"></div>
+<div id="main">
+  <div id="wrap"><svg id="svg" preserveAspectRatio="xMidYMin meet"></svg></div>
+  <div id="code"><h2>OPENCUR.cbl – PROCEDURE DIVISION</h2><div id="lines"></div></div>
+</div>
+
+<script>
+/* ---------- program tree (from OPENCUR.cbl) ---------- */
+// p = first line (paragraph / construct), c = second line (condition / action), id = leaf id
+const data = {
+  p: "PROGRAM", c: "OPENCUR",
+  children: [
+    { p: "MAINLINE", c: "ln 105-131", children: [
+      { p: "SEQUENCE", c: "no IF (DCL/OPEN)", children: [
+        { id: "main", p: "STOP RUN", c: "CLOSE C1 ln 131" } ] }
+    ]},
+    { p: "TEST-PARA", c: "ln 133-157", children: [
+      { p: "IF", c: "SQLCODE=0 @136", children: [
+        { id: "t1y", p: "THEN", c: "TEST 1 PASSED" },
+        { id: "t1n", p: "ELSE", c: "TEST 1 FAILED" } ] },
+      { p: "IF", c: "SQLCODE=0 @149", children: [
+        { id: "t2y", p: "THEN", c: "TEST 2 PASSED" },
+        { id: "t2n", p: "ELSE", c: "TEST 2 FAILED" } ] }
+    ]}
+  ]
+};
+
+/* ---------- test cases (from the testdata JSON files) ---------- */
+const tests = [
+  { key: "FS1", name: "FIRST_SENTENCES · test 1", file: "OPENCUR_PROGRAM_OPENCUR_FIRST_SENTENCES-testdata.json",
+    id: 1, status: "SUCCESS", start: "FIRST_SENTENCES (main flow)", color: "#2563eb",
+    leaves: ["main"],
+    pathlines: [105, 108, 116, 121, 125, 129, 131],
+    mocked: [133, 157],   // TEST-PARA is stubbed here (PERFORM mocked at 121)
+    inputs: [
+      "ln 108 SQL-DECLARE  → SQLCODE = 222222220",
+      "ln 116 SQL-OPEN     → SQLCODE = -222222220",
+      "ln 121 PERFORM OPENCUR/_TOPSECTION/TEST-PARA (stubbed, no branch walk)",
+      "ln 125 SQL-CLOSE    → SQLCODE = 444444440" ] },
+  { key: "TP1", name: "TEST-PARA · test 1", file: "OPENCUR_TEST-PARA-testdata.json",
+    id: 1, status: "SUCCESS", start: "TEST-PARA", color: "#e11d48",
+    leaves: ["t1n", "t2y"],
+    pathlines: [133, 136, 140, 141, 145, 149, 150, 151, 157],
+    inputs: [
+      "ln 136 SQLCODE = 1  → IF false → ELSE (TEST 1 FAILED)",
+      "ln 145 FETCH mock: SQLCODE = 0, FIRSTNME-LEN = 2, FIRSTNME-TEXT = 'AAAAAAAAAAAA'",
+      "ln 149 SQLCODE = 0  → IF true → THEN (TEST 2 PASSED)" ] },
+  { key: "TP2", name: "TEST-PARA · test 2", file: "OPENCUR_TEST-PARA-testdata.json",
+    id: 2, status: "SUCCESS", start: "TEST-PARA", color: "#16a34a",
+    leaves: ["t1y", "t2n"],
+    pathlines: [133, 136, 137, 138, 145, 149, 153, 157],
+    inputs: [
+      "ln 136 SQLCODE = 0  → IF true → THEN (TEST 1 PASSED)",
+      "ln 145 FETCH mock: SQLCODE = -888888880, FIRSTNME-LEN = 6404",
+      "ln 149 SQLCODE ≠ 0  → IF false → ELSE (TEST 2 FAILED)" ] }
+];
+
+/* ---------- COBOL source (OPENCUR.cbl lines 104-157) ---------- */
+const src = [
+  [104, "PROCEDURE DIVISION."],
+  [105, "    MOVE '000010' TO FIELD_EMPNO."],
+  [106, "* THE BELOW SNIPPET DECLARES A CURSOR", 1],
+  [108, "    EXEC SQL DECLARE C1 CURSOR  FOR"],
+  [111, "    SELECT FIRSTNME FROM TABLE_MYEMP"],
+  [112, "    WHERE EMPNO = :FIELD_EMPNO"],
+  [113, "    END-EXEC."],
+  [115, "* BELOW SNIPPET OPENS THE DECLARED CURSOR", 1],
+  [116, "    EXEC SQL"],
+  [117, "     OPEN C1"],
+  [118, "    END-EXEC."],
+  [120, "* TRIGGERS THE TEST ROUTINE TO INVOKE TESTING", 1],
+  [121, "    PERFORM TEST-PARA."],
+  [123, "* CLEANS UP THE OPERATION BY CLOSING THE CURSOR", 1],
+  [125, "    EXEC SQL"],
+  [126, "     CLOSE C1"],
+  [127, "    END-EXEC."],
+  [129, "    DISPLAY 'SUCCESSFUL CLEANUP : ' SQLCODE."],
+  [131, "    STOP RUN."],
+  [133, "TEST-PARA."],
+  [135, "* VALIDATES FOR SUCCESSFUL SQLCODE", 1],
+  [136, "    IF SQLCODE = 0 THEN"],
+  [137, "    DISPLAY \"TEST 1 : PASSED, CURSOR OPENED\""],
+  [138, "    DISPLAY \"SQLCODE : \" SQLCODE"],
+  [139, "    ELSE"],
+  [140, "    DISPLAY \" TEST 1 : FAILED \""],
+  [141, "    DISPLAY \"SQLCODE : \" SQLCODE SQLERRMC"],
+  [142, "    END-IF."],
+  [144, "* VALIDATES BY FETCHING FROM THE CURSOR", 1],
+  [145, "    EXEC SQL"],
+  [146, "     FETCH C1 INTO :FIELD_FIRSTNME"],
+  [147, "    END-EXEC."],
+  [149, "    IF SQLCODE = 0 THEN"],
+  [150, "    DISPLAY 'TEST 2 : PASSED , CURSOR FETCHED : ' FIELD_FIRSTNME"],
+  [151, "    DISPLAY \"SQLCODE : \" SQLCODE"],
+  [152, "      ELSE"],
+  [153, "    DISPLAY 'TEST 2 : FAILED WITH SQLCODE OF ' SQLCODE SQLERRMC"],
+  [154, "    END-IF."],
+  [157, "    EXIT."]
+];
+// multi-line statements: start line -> end line
+const stmtEnd = { 108: 113, 116: 118, 125: 127, 145: 147 };
+
+/* ---------- layout ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const boxW = 116, boxH = 38, gapX = 8, levelH = 92, padX = 74, padTop = 18, padBot = 10;
+
+const leaves = [];
+function layout(node, depth, parents) {
+  node.depth = depth;
+  node.y = padTop + depth * levelH;
+  if (!node.children) {
+    node.leafIdx = [leaves.length];
+    node.cx = padX + boxW / 2 + leaves.length * (boxW + gapX);
+    node.path = [...parents, node];
+    leaves.push(node);
+    return;
+  }
+  node.children.forEach(c => layout(c, depth + 1, [...parents, node]));
+  node.leafIdx = node.children.flatMap(c => c.leafIdx);
+  node.cx = (node.children[0].cx + node.children[node.children.length - 1].cx) / 2;
+}
+layout(data, 0, []);
+const leafById = Object.fromEntries(leaves.map((l, i) => [l.id, i]));
+
+const svg = document.getElementById("svg");
+const width = padX + leaves.length * (boxW + gapX) - gapX + 8;
+const height = padTop + 3 * levelH + boxH + padBot;
+svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+}
+
+[["Level 1", "program"], ["Level 2", "paragraph"], ["Level 3", "condition"], ["Level 4", "branch"]].forEach(([a, b], d) => {
+  const y = padTop + d * levelH + boxH / 2;
+  el("text", { class: "lvl", x: 4, y: y - 1 }, svg).textContent = a;
+  el("text", { class: "lvl", x: 4, y: y + 10, "font-weight": 400 }, svg).textContent = b;
+});
+
+function slotX(node, leafIndex) {
+  const n = node.leafIdx.length, k = node.leafIdx.indexOf(leafIndex);
+  return node.cx - boxW / 2 + 8 + (boxW - 16) * (k + 0.5) / n;
+}
+
+const strandG = el("g", {});
+const nodeG = el("g", {});
+
+const strands = leaves.map((leaf, i) => {
+  const els = [];
+  for (let d = 0; d < leaf.path.length - 1; d++) {
+    const a = leaf.path[d], b = leaf.path[d + 1];
+    const x1 = slotX(a, i), y1 = a.y + boxH, x2 = slotX(b, i), y2 = b.y, my = (y1 + y2) / 2;
+    const dd = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+    els.push({ base: el("path", { class: "strand", d: dd }, strandG),
+               flow: el("path", { class: "flow", d: dd }, strandG) });
+  }
+  return els;
+});
+
+const nodeEls = new Map();
+function draw(node) {
+  const isLeaf = !node.children;
+  const g = el("g", { class: "node" + (isLeaf ? " leaf" : "") }, nodeG);
+  const rect = el("rect", { x: node.cx - boxW / 2, y: node.y, width: boxW, height: boxH, rx: 5 }, g);
+  el("text", { class: "l1", x: node.cx, y: node.y + 15, "text-anchor": "middle" }, g).textContent = node.p;
+  el("text", { class: "l2", x: node.cx, y: node.y + 29, "text-anchor": "middle" }, g).textContent = node.c;
+  const bd = el("g", { class: "badge" }, g);
+  const circle = el("circle", { cx: node.cx - boxW / 2, cy: node.y, r: 7 }, bd);
+  const num = el("text", { x: node.cx - boxW / 2, y: node.y + 3 }, bd);
+  nodeEls.set(node, { g, rect, circle, num });
+  if (isLeaf) {
+    const t = tests.find(t => t.leaves.includes(node.id));
+    g.addEventListener("click", () => t && select(t.key));
+  } else node.children.forEach(draw);
+}
+draw(data);
+
+/* ---------- source panel ---------- */
+const linesDiv = document.getElementById("lines");
+const lineEls = {};
+src.forEach(([no, text, cmt]) => {
+  const d = document.createElement("div");
+  d.className = "ln" + (cmt ? " cmt" : "");
+  d.innerHTML = `<span class="no">${no}</span><span class="st"><i></i></span><span class="tx"></span>`;
+  d.querySelector(".tx").textContent = text;
+  linesDiv.appendChild(d);
+  lineEls[no] = d;
+});
+function clearLines() {
+  Object.values(lineEls).forEach(d => {
+    d.classList.remove("on", "mock");
+    d.style.background = ""; d.style.borderLeftColor = "transparent";
+    d.querySelector("i").textContent = ""; d.querySelector("i").style.background = "";
+  });
+}
+function markLine(no, color, step, bg) {
+  const end = stmtEnd[no] || no;
+  Object.keys(lineEls).map(Number).filter(n => n >= no && n <= end).forEach(n => {
+    const d = lineEls[n];
+    d.classList.add("on");
+    d.style.background = (bg || color) + "26";
+    d.style.borderLeftColor = color;
+    if (n === no && step != null) {
+      const i = d.querySelector("i"); i.textContent = step; i.style.background = color;
+    }
+  });
+}
+
+/* ---------- chips ---------- */
+const chipsDiv = document.getElementById("chips");
+const chipEls = {};
+function addChip(label, key, color, cls) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.setProperty("--c", color);
+  if (cls) b.className = cls;
+  b.addEventListener("click", () => select(chipEls[key].classList.contains("active") ? null : key));
+  chipsDiv.appendChild(b);
+  chipEls[key] = b;
+}
+tests.forEach(t => addChip(t.name, t.key, t.color));
+addChip("Show all", "__all__", "#374151", "all");
+
+const info = document.getElementById("info");
+const pathHtml = leaf => leaf.path.slice(1).map(n => n.depth === 1 ? n.p : `${n.p} ${n.c}`).join(" → ");
+
+/* ---------- selection ---------- */
+function select(key) {
+  const all = key === "__all__";
+  const sel = all ? tests : tests.filter(t => t.key === key);
+  const leafTest = {};                         // leaf index -> test
+  sel.forEach(t => t.leaves.forEach(id => leafTest[leafById[id]] = t));
+  const on = new Set(Object.keys(leafTest).map(Number));
+  const colorOf = i => leafTest[i].color;
+
+  svg.classList.toggle("dim", on.size > 0);
+  svg.classList.toggle("nobadge", all);
+
+  strands.forEach((segs, i) => segs.forEach(s => {
+    const hl = on.has(i);
+    s.base.classList.toggle("on", hl);
+    s.flow.classList.toggle("on", hl);
+    s.base.style.stroke = hl ? colorOf(i) : "";
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${colorOf(i)})` : "";
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  // node colours + execution-order numbers (single test only)
+  const nodeColor = new Map(), nodeNo = new Map();
+  if (!all && sel[0]) {
+    let n = 0;
+    sel[0].leaves.forEach(id => leaves[leafById[id]].path.forEach(nd => {
+      if (!nodeNo.has(nd)) nodeNo.set(nd, ++n);
+      nodeColor.set(nd, sel[0].color);
+    }));
+  } else {
+    on.forEach(i => leaves[i].path.forEach(nd => nodeColor.set(nd, nd.children ? "#374151" : colorOf(i))));
+  }
+  nodeEls.forEach((e, nd) => {
+    const c = nodeColor.get(nd);
+    e.g.classList.toggle("on", !!c);
+    e.rect.style.fill = c || "";
+    e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || "";
+    e.num.style.fill = c || "";
+    e.num.textContent = nodeNo.get(nd) || "";
+  });
+
+  // source panel
+  clearLines();
+  if (all) {
+    const count = {};
+    tests.forEach(t => t.pathlines.forEach(l => (count[l] = count[l] || []).push(t)));
+    Object.entries(count).forEach(([l, ts]) => markLine(+l, ts.length === 1 ? ts[0].color : "#374151"));
+  } else if (sel[0]) {
+    const t = sel[0];
+    t.mocked && Object.keys(lineEls).map(Number).filter(n => n >= 133).forEach(n => lineEls[n].classList.add("mock"));
+    t.pathlines.forEach((l, k) => markLine(l, t.color, k + 1));
+    const first = lineEls[t.pathlines[0]];
+    first && first.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  Object.entries(chipEls).forEach(([k, b]) => b.classList.toggle("active", k === key));
+
+  if (!all && sel[0]) {
+    const t = sel[0];
+    info.style.borderLeftColor = t.color;
+    info.style.background = t.color + "1f";
+    info.innerHTML =
+      `<b style="color:${t.color}">${t.name}</b><span class="tag">${t.status}</span>` +
+      `<span style="font-size:11px;color:#57606a">${t.file} · test_id ${t.id} · start: ${t.start}</span>` +
+      `<div><b style="font-size:11px">pathlines</b> ${t.pathlines.join(" → ")}</div>` +
+      t.leaves.map(id => `<div><b style="font-size:11px">tree path</b> ${pathHtml(leaves[leafById[id]])}</div>`).join("") +
+      t.inputs.map(s => `<div style="color:#57606a">${s}</div>`).join("");
+  } else if (all) {
+    info.style.borderLeftColor = "#374151";
+    info.style.background = "#eef0f3";
+    const covered = new Set(Object.keys(leafTest)).size;
+    info.innerHTML = `<b>All tests</b> – each test path drawn in its own colour · ` +
+      `${covered}/${leaves.length} leaf branches covered · lines on several test paths are shown dark`;
+  } else {
+    info.style.borderLeftColor = "#c9ced6";
+    info.style.background = "#eef0f3";
+    info.innerHTML = "<b>No test selected</b> – pick one above";
+  }
+}
+select(null);
+</script>
+</body>
+</html>

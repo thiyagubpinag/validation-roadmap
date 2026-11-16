@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CALCOPS1 – Business Rules &amp; Functionality Path Highlighter</title>
+<style>
+  html, body { height:100%; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:#f7f8fa; color:#1f2328; display:flex; flex-direction:column; overflow:hidden; }
+  h1 { font-size:17px; margin:10px 16px 2px; }
+  p.sub { margin:0 16px 8px; color:#57606a; font-size:12px; }
+  .view { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  .view[hidden] { display:none; }
+  .chips { flex:none; display:flex; flex-wrap:wrap; gap:7px; margin:0 16px 8px; }
+  .chips button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 12px; border:2px solid var(--c,#c9ced6); border-radius:16px; background:#fff; color:var(--c,#1f2328); cursor:pointer; transition:all .15s; }
+  .chips button:hover { background:var(--c); color:#fff; transform:translateY(-1px); }
+  .chips button.active { background:var(--c); color:#fff; box-shadow:0 3px 10px var(--c); }
+  .chips button.all { --c:#374151; }
+  .info { flex:none; margin:0 16px 4px; padding:7px 12px; font-size:12.5px; border-left:5px solid #c9ced6; background:#eef0f3; border-radius:4px; font-family:ui-monospace,Menlo,Consolas,monospace; color:#374151; transition:all .2s; }
+  .info b { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-size:13px; margin-right:6px; }
+  .info div { margin-top:2px; }
+  .info .tag { display:inline-block; font:700 10.5px -apple-system,"Segoe UI",sans-serif; padding:1px 7px; border-radius:9px; color:#fff; margin-right:6px; }
+  .info button.drill { margin-top:6px; font:700 12px -apple-system,"Segoe UI",sans-serif; padding:4px 12px; border:0; border-radius:14px; background:var(--c); color:#fff; cursor:pointer; }
+  .info button.drill:hover { filter:brightness(1.12); }
+  .wrap { flex:1 1 auto; min-height:0; padding:0 8px 8px; }
+  .wrap svg { width:100%; height:100%; display:block; }
+
+  .strand { fill:none; stroke-linecap:round; stroke:#cfd4db; stroke-width:1.5; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .dim .strand:not(.on) { opacity:.35; }
+  .strand.on { stroke-width:6; }
+  .flow { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-dasharray:1 13; opacity:0; pointer-events:none; }
+  .flow.on { opacity:.9; animation:flow 0.9s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-14; } }
+
+  .lvl { font-size:9px; fill:#57606a; font-weight:600; }
+  .node rect { fill:#fff; stroke:#cfd4db; stroke-width:1.5; transition:fill .25s, stroke .25s; }
+  .node text { fill:#9aa1ab; transition:fill .25s; }
+  .node .l1 { font-size:8.5px; font-weight:700; letter-spacing:.02em; }
+  .node .l2 { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:9.5px; }
+  .node.leaf { cursor:pointer; }
+  .node.leaf:hover rect { stroke:#6b7280; }
+  .dim .node:not(.on) { opacity:.45; }
+  .node.on rect { stroke-width:2.5; }
+  .node.on text { fill:#fff; }
+  .node.on .l1 { opacity:.85; }
+  .badge circle { fill:#fff; stroke-width:2; }
+  .badge text { font-size:8px; font-weight:800; text-anchor:middle; }
+  .badge { display:none; }
+  .node.on .badge { display:block; }
+
+  #topbar { flex:none; display:flex; align-items:center; gap:8px; margin:0 16px 6px; font-size:12px; color:#57606a; }
+  #topbar button { font:700 12px -apple-system,"Segoe UI",sans-serif; padding:4px 11px; border:1.5px solid #374151; border-radius:14px; background:#fff; color:#374151; cursor:pointer; }
+  #topbar button:hover { background:#374151; color:#fff; }
+  #topbar #breadcrumb { flex:1 1 auto; }
+  #kpi { flex:none; display:flex; gap:10px; margin:0 16px 8px; flex-wrap:wrap; }
+  .card { background:#fff; border:1px solid #d8dce2; border-radius:6px; padding:6px 14px; min-width:130px; }
+  .card .v { font-size:20px; font-weight:800; }
+  .card .k { font-size:10.5px; color:#57606a; text-transform:uppercase; letter-spacing:.04em; }
+  .bar { height:5px; border-radius:3px; background:#e5e7eb; margin-top:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; }
+  #wrapB { flex:none; overflow-x:auto; overflow-y:hidden; padding:0 8px 6px; }
+  #svgB { width:1700px; min-width:100%; display:block; height:auto; }
+  #codeSec { margin:0 16px 12px; background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:hidden; }
+  #codeSec h2 { margin:0; padding:6px 10px; font-size:11.5px; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; display:flex; gap:14px; align-items:center; }
+  #codeSec h2 .lg { font-weight:400; font-size:10.5px; color:#57606a; }
+  #codeSec h2 .lg i { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 8px; vertical-align:-1px; }
+  #code { max-height:330px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; position:relative; }
+  .cl { display:flex; align-items:center; white-space:pre; border-left:4px solid transparent; padding:1px 0; color:#9aa1ab; transition:background .2s, color .2s; }
+  .cl .no { flex:none; width:38px; text-align:right; margin-right:8px; color:#c0c5cc; }
+  .cl .st { flex:none; width:26px; text-align:center; font:800 9px -apple-system,sans-serif; }
+  .cl .st i { display:none; font-style:normal; color:#fff; border-radius:8px; padding:1px 5px; }
+  .cl .tx { flex:1 1 auto; min-width:0; }
+  .cl .meta { flex:none; padding:0 10px; font:700 10px -apple-system,sans-serif; display:flex; gap:6px; }
+  .cl .meta span { border-radius:8px; padding:0 6px; background:#eef0f3; color:#57606a; }
+  .cl.cmt .tx { font-style:italic; }
+  .cl.sel { color:#111; font-weight:600; }
+  .cl.sel .st i { display:inline-block; }
+  .cl.sel.cmt { font-weight:400; }
+  .cl.skip { opacity:.38; }
+  .cl.c-ok { color:#374151; border-left-color:#16a34a; }
+  .cl.c-gap { color:#9f1239; background:#fff1f2; border-left-color:#e11d48; }
+  #viewB { overflow:auto; }
+  #viewB > * { flex:none; }
+  #panel { height:320px; display:grid; grid-template-columns:1.35fr 1fr; gap:12px; margin:0 16px 14px; }
+  #panel section { background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:auto; }
+  #panel h2 { position:sticky; top:0; margin:0; padding:6px 10px; font-size:11.5px; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; }
+  table.br { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.br th { text-align:left; font-size:10.5px; color:#57606a; padding:4px 8px; border-bottom:1px solid #e5e7eb; }
+  table.br td { padding:4px 8px; border-bottom:1px solid #f0f1f3; vertical-align:top; }
+  table.br td.id { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; white-space:nowrap; }
+  .pill { display:inline-block; font:700 10px ui-monospace,Menlo,Consolas,monospace; padding:1px 6px; border-radius:8px; margin:1px 2px 1px 0; }
+  .pill.ok { background:#dcfce7; color:#166534; }
+  .pill.gap { background:#ffe4e6; color:#9f1239; }
+  .gaps { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; }
+  .gaps div { padding:3px 10px; border-bottom:1px solid #f0f1f3; cursor:pointer; white-space:nowrap; }
+  .gaps div:hover { background:#fff1f2; }
+  .gaps div.active { background:#ffe4e6; font-weight:700; }
+  .node.cov-ok rect { fill:#dcfce7; stroke:#16a34a; }
+  .node.cov-gap rect { fill:#fff1f2; stroke:#e11d48; stroke-dasharray:4 3; }
+  .node.cov-part rect { fill:#fef3c7; stroke:#d97706; }
+  .node.cov-ok text, .node.cov-gap text, .node.cov-part text { fill:#1f2328; }
+  .sc { display:inline-block; font:700 11px ui-monospace,Menlo,Consolas,monospace; padding:2px 8px; border-radius:10px; margin-left:6px; }
+  .sc-00 { background:#dcfce7; color:#166534; }
+  .sc-10 { background:#ffe4e6; color:#9f1239; }
+  .sc-20 { background:#ffe4e6; color:#9f1239; }
+  .sc-30 { background:#fef3c7; color:#92400e; }
+  .sc-40 { background:#fef3c7; color:#92400e; }
+  .sc-50 { background:#ede9fe; color:#5b21b6; }
+  .sc-60 { background:#e0f2fe; color:#075985; }
+</style>
+</head>
+<body>
+<h1 id="title">CALCOPS1 – Business Rules &amp; Functionality Path Highlighter</h1>
+<p class="sub" id="subtitle">Click an operation below to highlight its execution path through paragraph → condition → outcome. Click a leaf box directly too. Numbered badges show execution order.</p>
+
+<section class="view" id="viewA">
+  <div class="chips" id="chips"></div>
+  <div class="info" id="info"></div>
+  <div class="wrap"><svg id="svg" preserveAspectRatio="xMidYMin meet"></svg></div>
+</section>
+
+<section class="view" id="viewB" hidden>
+  <div id="topbar">
+    <button id="back">&#8592; Program overview</button>
+    <span id="breadcrumb">0000-MAIN-PARA → EVALUATE WS-OP-CODE → 2000-RUN-TEST-CASE</span>
+  </div>
+  <div id="kpi"></div>
+  <div class="chips" id="chipsB"></div>
+  <div class="info" id="infoB"></div>
+  <div id="wrapB"><svg id="svgB"></svg></div>
+  <div id="codeSec">
+    <h2 id="codeSec-title">COBOL – active operation paragraph <span class="lg" id="codeLg"></span></h2>
+    <div id="code"></div>
+  </div>
+  <div id="panel">
+    <section><h2>Business-rule outcomes &amp; test coverage</h2><div id="brTable"></div></section>
+    <section><h2 id="gapTitle">End-to-end paths</h2><div class="gaps" id="gaps"></div></section>
+  </div>
+</section>
+
+<script>
+/* ================================================================
+   UTILITY: SVG tree renderer
+   ================================================================ */
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+
+function makeTree(svg, data, o) {
+  const { boxW, boxH, gapX, levelH, padX, padTop, padBot } = o;
+  const leaves = [];
+  (function layout(node, depth, parents) {
+    node.depth = depth;
+    node.y = padTop + depth * levelH;
+    if (!node.children) {
+      node.leafIdx = [leaves.length];
+      node.cx = padX + boxW / 2 + leaves.length * (boxW + gapX);
+      node.path = [...parents, node];
+      leaves.push(node);
+      return;
+    }
+    node.children.forEach(c => layout(c, depth + 1, [...parents, node]));
+    node.leafIdx = node.children.flatMap(c => c.leafIdx);
+    node.cx = (node.children[0].cx + node.children[node.children.length - 1].cx) / 2;
+  })(data, 0, []);
+
+  const width  = padX + leaves.length * (boxW + gapX) - gapX + 8;
+  const height = padTop + Math.max(...leaves.map(l => l.depth)) * levelH + boxH + padBot;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  o.levels.forEach(([a, b], d) => {
+    const y = padTop + d * levelH + boxH / 2;
+    el("text", { class:"lvl", x:4, y:y - 1 }, svg).textContent = a;
+    el("text", { class:"lvl", x:4, y:y + 10, "font-weight":400 }, svg).textContent = b;
+  });
+
+  const slotX = (node, li) => {
+    const n = node.leafIdx.length, k = node.leafIdx.indexOf(li);
+    return node.cx - boxW / 2 + 8 + (boxW - 16) * (k + 0.5) / n;
+  };
+  const strandG = el("g", {}, svg), nodeG = el("g", {}, svg);
+
+  const strands = leaves.map((leaf, i) => {
+    const els = [];
+    for (let d = 0; d < leaf.path.length - 1; d++) {
+      const a = leaf.path[d], b = leaf.path[d + 1];
+      const x1 = slotX(a, i), y1 = a.y + boxH, x2 = slotX(b, i), y2 = b.y, my = (y1 + y2) / 2;
+      const dd = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+      els.push({ base: el("path", { class:"strand", d:dd }, strandG),
+                 flow: el("path", { class:"flow",   d:dd }, strandG) });
+    }
+    return els;
+  });
+
+  const nodeEls = new Map();
+  (function draw(node) {
+    const isLeaf = !node.children;
+    const g    = el("g",    { class:"node" + (isLeaf ? " leaf" : "") }, nodeG);
+    const rect = el("rect", { x:node.cx - boxW/2, y:node.y, width:boxW, height:boxH, rx:5 }, g);
+    el("text", { class:"l1", x:node.cx, y:node.y + 15, "text-anchor":"middle" }, g).textContent = node.p;
+    el("text", { class:"l2", x:node.cx, y:node.y + 29, "text-anchor":"middle" }, g).textContent = node.c;
+    if (node.exit) el("rect", { x:node.cx - boxW/2 + 5, y:node.y + boxH - 3, width:boxW - 10, height:2, rx:1, fill:"#e11d48" }, g);
+    const bd     = el("g",      { class:"badge" }, g);
+    const circle = el("circle", { cx:node.cx - boxW/2, cy:node.y, r:7 }, bd);
+    const num    = el("text",   { x:node.cx - boxW/2, y:node.y + 3 }, bd);
+    num.textContent = node.depth + 1;
+    nodeEls.set(node, { g, rect, circle, num, bd });
+    if (isLeaf) g.addEventListener("click", () => o.onLeaf && o.onLeaf(node));
+    else node.children.forEach(draw);
+  })(data);
+
+  return { leaves, strands, nodeEls, width, height };
+}
+
+/* ================================================================
+   SHARED CONSTANTS
+   ================================================================ */
+const palette = ["#e11d48","#2563eb","#16a34a","#ea580c","#9333ea","#0891b2","#ca8a04","#db2777","#4f46e5","#0d9488"];
+
+function addChip(host, store, label, key, color, cls, handler) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.setProperty("--c", color);
+  if (cls) b.className = cls;
+  b.addEventListener("click", () => handler(store[key].classList.contains("active") ? null : key));
+  host.appendChild(b);
+  store[key] = b;
+}
+
+/* ================================================================
+   BUSINESS-RULE DATA
+   Each node: id, p (branch label), c (action label),
+              br (rule id), s (short), d (description), sc (status code), exit
+   ================================================================ */
+function mkL(id, p, c, br, s, d, sc, exit) {
+  return { id, p, c, br, s, d, sc, exit: !!exit };
+}
+
+const DA = {
+  a_oor_a: mkL("a_oor_a","WHEN",  "A OUT-OF-RANGE",    "BR-A01","A OOR",      "Operand A exceeds ±5,000,000.00 — set STATUS-OUT-OF-RANGE","40",1),
+  a_oor_b: mkL("a_oor_b","WHEN",  "B OUT-OF-RANGE",    "BR-A02","B OOR",      "Operand B exceeds ±5,000,000.00 — set STATUS-OUT-OF-RANGE","40",1),
+  a_zero:  mkL("a_zero", "WHEN",  "BOTH ZERO → 0",     "BR-A03","both zero",  "Both operands zero — RESULT = 0, STATUS-OK","00"),
+  a_ok:    mkL("a_ok",   "NOT SE","ADD → STATUS-OK",    "BR-A04","sum ok",     "Valid non-zero operands — RESULT = A + B, STATUS-OK","00"),
+  a_ovf:   mkL("a_ovf",  "ON SE", "ADD → OVERFLOW",     "BR-A05","overflow",   "Result field too small — STATUS-OVERFLOW","10",1)
+};
+const DS = {
+  s_oor_a: mkL("s_oor_a","WHEN",  "A OUT-OF-RANGE",    "BR-S01","A OOR",      "Operand A out of range — STATUS-OUT-OF-RANGE","40",1),
+  s_oor_b: mkL("s_oor_b","WHEN",  "B OUT-OF-RANGE",    "BR-S02","B OOR",      "Operand B out of range — STATUS-OUT-OF-RANGE","40",1),
+  s_equal: mkL("s_equal","WHEN",  "A = B → ZERO",      "BR-S03","equal → 0",  "Equal operands — RESULT = 0, STATUS-OK","00"),
+  s_ok:    mkL("s_ok",   "ELSE",  "SUB → STATUS-OK",   "BR-S04","diff ok",    "A − B computed, positive result — STATUS-OK","00"),
+  s_neg:   mkL("s_neg",  "IF",    "RESULT<0 → NEG",    "BR-S05","neg result", "Result < 0, negatives not permitted — STATUS-NEGATIVE-RESULT","50",1),
+  s_ovf:   mkL("s_ovf",  "ON SE", "SUB → OVERFLOW",    "BR-S06","overflow",   "Size error on subtraction — STATUS-OVERFLOW","10",1)
+};
+const DM = {
+  m_oor_a: mkL("m_oor_a","WHEN",  "A OUT-OF-RANGE",    "BR-M01","A OOR",      "Operand A out of range — STATUS-OUT-OF-RANGE","40",1),
+  m_oor_b: mkL("m_oor_b","WHEN",  "B OUT-OF-RANGE",    "BR-M02","B OOR",      "Operand B out of range — STATUS-OUT-OF-RANGE","40",1),
+  m_zero:  mkL("m_zero", "WHEN",  "A=0 OR B=0 → 0",   "BR-M03","zero op",    "Either operand zero — RESULT = 0, STATUS-OK","00"),
+  m_ok:    mkL("m_ok",   "NOT SE","MUL → STATUS-OK",   "BR-M04","product ok", "RESULT = A × B (rounded), STATUS-OK","00"),
+  m_ovf:   mkL("m_ovf",  "ON SE", "MUL → OVERFLOW",    "BR-M05","overflow",   "Very large operands — STATUS-OVERFLOW","10",1),
+  m_prec:  mkL("m_prec", "IF",    "RESULT=0 → PREC",   "BR-M06","prec loss",  "Non-zero operands but product rounds to zero — STATUS-PRECISION-LOSS","60",1)
+};
+const DD = {
+  d_oor_a: mkL("d_oor_a","WHEN",  "A OUT-OF-RANGE",    "BR-D01","A OOR",      "Operand A out of range — STATUS-OUT-OF-RANGE","40",1),
+  d_oor_b: mkL("d_oor_b","WHEN",  "B OUT-OF-RANGE",    "BR-D02","B OOR",      "Operand B out of range — STATUS-OUT-OF-RANGE","40",1),
+  d_div0:  mkL("d_div0", "WHEN",  "B=0 → DIV-ZERO",   "BR-D03","div by 0",   "Divisor is zero — STATUS-DIVIDE-BY-ZERO","20",1),
+  d_prec:  mkL("d_prec", "WHEN",  "ABS(B)<0.1 → PREC","BR-D04","prec floor", "Divisor absolute value < 0.1 — STATUS-PRECISION-LOSS","60",1),
+  d_zeroA: mkL("d_zeroA","WHEN",  "A=0 → RESULT=0",   "BR-D05","zero dvd",   "Dividend is zero — RESULT = 0, STATUS-OK","00"),
+  d_ok:    mkL("d_ok",   "NOT SE","DIV → STATUS-OK",   "BR-D06","quotient ok","RESULT = A ÷ B (rounded), REMAINDER captured, STATUS-OK","00"),
+  d_ovf:   mkL("d_ovf",  "ON SE", "DIV → OVERFLOW",    "BR-D07","overflow",   "Result field overflow — STATUS-OVERFLOW","10",1)
+};
+const DI = {
+  inv_op:  mkL("inv_op", "WHEN OTHER","STATUS-INVALID-OP","BR-I01","invalid op","Unrecognised WS-OP-CODE — STATUS-INVALID-OPERATION","30",1)
+};
+
+/* ================================================================
+   condN helper — builds a condition node for the drill-down tree
+   Must be declared BEFORE the OPS object that calls it.
+   ================================================================ */
+function condN(D, p, c, ids) {
+  return { p, c, children: ids.map(id => ({ id, p:D[id].p, c:D[id].c, exit:D[id].exit })) };
+}
+
+/* ================================================================
+   computePaths — one "path" per leaf outcome (for coverage matching)
+   ================================================================ */
+function computePaths(leafIds, D) {
+  return leafIds.map((id, i) => ({
+    k:   "P" + String(i + 1).padStart(2, "0"),
+    ids: [id],
+    key: id
+  }));
+}
+
+/* ================================================================
+   buildOp — assemble one operation descriptor
+   ================================================================ */
+function buildOp(opKey, paraName, D, treeData, tests) {
+  tests.forEach((t, i) => { t.color = palette[i % palette.length]; t.key = t.leaves.join(">"); });
+  const leafIds     = Object.keys(D);
+  const coveredLeaf = new Set(tests.flatMap(t => t.leaves));
+  const paths       = computePaths(leafIds, D);
+  paths.forEach(p => { p.test = tests.find(t => t.key === p.key) || null; });
+  const coveredPaths = paths.filter(p => p.test);
+  const gapPaths     = paths.filter(p => !p.test);
+  return { opKey, paraName, D, treeData, tests, leafIds, coveredLeaf, paths, coveredPaths, gapPaths };
+}
+
+/* ================================================================
+   OPS — one descriptor per operation.
+   condN, buildOp, and computePaths are all declared above.
+   ================================================================ */
+const OPS = {
+  ADD: buildOp("ADD", "3000-ADDITION-PARA", DA,
+    { p:"PARAGRAPH", c:"3000-ADDITION-PARA", children:[
+      { p:"RANGE-CHECK", c:"OPERAND LIMITS", children:[
+        condN(DA,"WHEN","A > MAX / A < MIN",["a_oor_a"]),
+        condN(DA,"WHEN","B > MAX / B < MIN",["a_oor_b"])
+      ]},
+      { p:"ZERO-CHECK", c:"BOTH A=0 AND B=0", children:[
+        condN(DA,"WHEN","A=0 AND B=0",["a_zero"])
+      ]},
+      { p:"ADD-STMT", c:"ADD A B GIVING RESULT", children:[
+        condN(DA,"NOT SE","SUCCESS", ["a_ok"]),
+        condN(DA,"ON SE", "OVERFLOW",["a_ovf"])
+      ]}
+    ]},
+    [
+      { k:"T-A01", n:"Normal addition",       res:"STATUS 00", sc:"00", leaves:["a_ok"],    inp:"A=100.00  B=250.50" },
+      { k:"T-A02", n:"Both operands zero",    res:"STATUS 00", sc:"00", leaves:["a_zero"],  inp:"A=0  B=0" },
+      { k:"T-A03", n:"Near-limit operands",   res:"STATUS 00", sc:"00", leaves:["a_ok"],    inp:"A=4999999.99  B=0.01" },
+      { k:"T-A04", n:"Operand A over max",    res:"STATUS 40", sc:"40", leaves:["a_oor_a"], inp:"A=5000000.01  B=1.00" },
+      { k:"T-A05", n:"Negative + positive",   res:"STATUS 00", sc:"00", leaves:["a_ok"],    inp:"A=-500.00  B=200.00" }
+    ]
+  ),
+
+  SUB: buildOp("SUB", "3100-SUBTRACTION-PARA", DS,
+    { p:"PARAGRAPH", c:"3100-SUBTRACTION-PARA", children:[
+      { p:"RANGE-CHECK", c:"OPERAND LIMITS", children:[
+        condN(DS,"WHEN","A > MAX / A < MIN",["s_oor_a"]),
+        condN(DS,"WHEN","B > MAX / B < MIN",["s_oor_b"])
+      ]},
+      { p:"EQUAL-CHECK", c:"A = B", children:[
+        condN(DS,"WHEN","A = B → ZERO",["s_equal"])
+      ]},
+      { p:"SUBTRACT", c:"SUB B FROM A GIVING RESULT", children:[
+        condN(DS,"ON SE","OVERFLOW",        ["s_ovf"]),
+        condN(DS,"ELSE", "DIFF OK / NEG",   ["s_ok","s_neg"])
+      ]}
+    ]},
+    [
+      { k:"T-S01", n:"Normal subtraction",    res:"STATUS 00", sc:"00", leaves:["s_ok"],    inp:"A=500.00  B=200.00" },
+      { k:"T-S02", n:"Result negative",       res:"STATUS 50", sc:"50", leaves:["s_neg"],   inp:"A=100.00  B=250.00" },
+      { k:"T-S03", n:"Equal operands",        res:"STATUS 00", sc:"00", leaves:["s_equal"], inp:"A=75.00  B=75.00" },
+      { k:"T-S04", n:"Large negative result", res:"STATUS 50", sc:"50", leaves:["s_neg"],   inp:"A=-4999999.99  B=1.00" }
+    ]
+  ),
+
+  MUL: buildOp("MUL", "3200-MULTIPLY-PARA", DM,
+    { p:"PARAGRAPH", c:"3200-MULTIPLY-PARA", children:[
+      { p:"RANGE-CHECK", c:"OPERAND LIMITS", children:[
+        condN(DM,"WHEN","A > MAX / A < MIN",["m_oor_a"]),
+        condN(DM,"WHEN","B > MAX / B < MIN",["m_oor_b"])
+      ]},
+      { p:"ZERO-CHECK", c:"A=0 OR B=0", children:[
+        condN(DM,"WHEN","A=0 OR B=0 → 0",["m_zero"])
+      ]},
+      { p:"MULTIPLY", c:"MUL A BY B ROUNDED", children:[
+        condN(DM,"ON SE", "OVERFLOW",        ["m_ovf"]),
+        condN(DM,"NOT SE","PRODUCT / PREC",  ["m_ok","m_prec"])
+      ]}
+    ]},
+    [
+      { k:"T-M01", n:"Normal multiplication",   res:"STATUS 00", sc:"00", leaves:["m_ok"],   inp:"A=12.50  B=4.00" },
+      { k:"T-M02", n:"Large operands overflow", res:"STATUS 10", sc:"10", leaves:["m_ovf"],  inp:"A=4999999.99  B=4999999.99" },
+      { k:"T-M03", n:"Zero operand",            res:"STATUS 00", sc:"00", leaves:["m_zero"], inp:"A=1234.56  B=0" },
+      { k:"T-M04", n:"Tiny product prec loss",  res:"STATUS 60", sc:"60", leaves:["m_prec"], inp:"A=0.01  B=0.01" }
+    ]
+  ),
+
+  DIV: buildOp("DIV", "3300-DIVIDE-PARA", DD,
+    { p:"PARAGRAPH", c:"3300-DIVIDE-PARA", children:[
+      { p:"RANGE-CHECK", c:"OPERAND LIMITS", children:[
+        condN(DD,"WHEN","A > MAX / A < MIN",["d_oor_a"]),
+        condN(DD,"WHEN","B > MAX / B < MIN",["d_oor_b"])
+      ]},
+      { p:"DIVISOR-CHECKS", c:"B=0 / ABS(B)<0.1", children:[
+        condN(DD,"WHEN","B = 0 → DIV-ZERO",  ["d_div0"]),
+        condN(DD,"WHEN","ABS(B)<0.1 → PREC", ["d_prec"])
+      ]},
+      { p:"ZERO-DVD", c:"A = 0", children:[
+        condN(DD,"WHEN","A=0 → RESULT=0",["d_zeroA"])
+      ]},
+      { p:"DIVIDE", c:"DIV A BY B ROUNDED REM", children:[
+        condN(DD,"ON SE", "OVERFLOW",["d_ovf"]),
+        condN(DD,"NOT SE","SUCCESS", ["d_ok"])
+      ]}
+    ]},
+    [
+      { k:"T-D01", n:"Divide by zero",           res:"STATUS 20", sc:"20", leaves:["d_div0"],  inp:"A=100.00  B=0" },
+      { k:"T-D02", n:"Normal division",          res:"STATUS 00", sc:"00", leaves:["d_ok"],    inp:"A=100.00  B=3.00" },
+      { k:"T-D03", n:"Divisor below prec floor", res:"STATUS 60", sc:"60", leaves:["d_prec"],  inp:"A=1.00  B=0.05" },
+      { k:"T-D04", n:"Large dividend",           res:"STATUS 00", sc:"00", leaves:["d_ok"],    inp:"A=4999999.99  B=0.50" }
+    ]
+  ),
+
+  INV: buildOp("INV", "2000-RUN-TEST-CASE", DI,
+    { p:"PARAGRAPH", c:"2000-RUN-TEST-CASE", children:[
+      { p:"EVALUATE", c:"EVALUATE TRUE", children:[
+        condN(DI,"WHEN OTHER","UNRECOGNISED CODE",["inv_op"])
+      ]}
+    ]},
+    [
+      { k:"T-I01", n:"Unknown op code 'X'", res:"STATUS 30", sc:"30", leaves:["inv_op"], inp:"OP-CODE=X  A=1.00  B=1.00" }
+    ]
+  )
+};
+
+/* ================================================================
+   SOURCE CODE panels (per operation)
+   Each row: [cobolText, optionalBrId_or_null, optionalLeafIdArray_or_null]
+   Rules: 2-element rows = [text, ids]; 3-element rows = [text, br, ids]
+   ================================================================ */
+const SRC_BY_OP = {
+  ADD:[
+    ["*    BOUNDARY CHECKS BEFORE ARITHMETIC",null,null],
+    ["    EVALUATE TRUE",null,null],
+    ["        WHEN WS-OPERAND-A > WS-MAX-OPERAND",null,["a_oor_a","a_oor_b","a_zero","a_ok","a_ovf"]],
+    ["          OR WS-OPERAND-A < WS-MIN-OPERAND",null,["a_oor_a","a_oor_b","a_zero","a_ok","a_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-A01",["a_oor_a"]],
+    ["        WHEN WS-OPERAND-B > WS-MAX-OPERAND",null,["a_oor_b","a_zero","a_ok","a_ovf"]],
+    ["          OR WS-OPERAND-B < WS-MIN-OPERAND",null,["a_oor_b","a_zero","a_ok","a_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-A02",["a_oor_b"]],
+    ["        WHEN WS-OPERAND-A = ZERO AND WS-OPERAND-B = ZERO",null,["a_zero","a_ok","a_ovf"]],
+    ["            MOVE ZERO TO WS-RESULT","BR-A03",["a_zero"]],
+    ["            SET STATUS-OK TO TRUE",null,["a_zero"]],
+    ["        WHEN OTHER",null,["a_ok","a_ovf"]],
+    ["            ADD WS-OPERAND-A WS-OPERAND-B GIVING WS-RESULT",null,["a_ok","a_ovf"]],
+    ["                ON SIZE ERROR","BR-A05",["a_ovf"]],
+    ["                    SET STATUS-OVERFLOW TO TRUE",null,["a_ovf"]],
+    ["                NOT ON SIZE ERROR","BR-A04",["a_ok"]],
+    ["                    SET STATUS-OK TO TRUE",null,["a_ok"]],
+    ["                END-ADD",null,["a_ok","a_ovf"]],
+    ["    END-EVALUATE.",null,null]
+  ],
+  SUB:[
+    ["*    BOUNDARY CHECKS BEFORE ARITHMETIC",null,null],
+    ["    EVALUATE TRUE",null,null],
+    ["        WHEN WS-OPERAND-A > WS-MAX-OPERAND",null,["s_oor_a","s_oor_b","s_equal","s_ok","s_neg","s_ovf"]],
+    ["          OR WS-OPERAND-A < WS-MIN-OPERAND",null,["s_oor_a","s_oor_b","s_equal","s_ok","s_neg","s_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-S01",["s_oor_a"]],
+    ["        WHEN WS-OPERAND-B > WS-MAX-OPERAND",null,["s_oor_b","s_equal","s_ok","s_neg","s_ovf"]],
+    ["          OR WS-OPERAND-B < WS-MIN-OPERAND",null,["s_oor_b","s_equal","s_ok","s_neg","s_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-S02",["s_oor_b"]],
+    ["        WHEN WS-OPERAND-A = WS-OPERAND-B",null,["s_equal","s_ok","s_neg","s_ovf"]],
+    ["            MOVE ZERO TO WS-RESULT","BR-S03",["s_equal"]],
+    ["            SET STATUS-OK TO TRUE",null,["s_equal"]],
+    ["        WHEN OTHER",null,["s_ok","s_neg","s_ovf"]],
+    ["            SUBTRACT WS-OPERAND-B FROM WS-OPERAND-A GIVING WS-RESULT",null,["s_ok","s_neg","s_ovf"]],
+    ["                ON SIZE ERROR","BR-S06",["s_ovf"]],
+    ["                    SET STATUS-OVERFLOW TO TRUE",null,["s_ovf"]],
+    ["                END-SUBTRACT",null,["s_ok","s_neg"]],
+    ["            IF STATUS-OK",null,["s_ok","s_neg"]],
+    ["                IF WS-RESULT < ZERO","BR-S05",["s_neg"]],
+    ["                    AND NOT NEGATIVE-ALLOWED",null,["s_neg"]],
+    ["                    SET STATUS-NEGATIVE-RESULT TO TRUE",null,["s_neg"]],
+    ["                END-IF",null,["s_ok","s_neg"]],
+    ["            END-IF",null,["s_ok","s_neg"]],
+    ["    END-EVALUATE.",null,null]
+  ],
+  MUL:[
+    ["*    BOUNDARY CHECKS BEFORE ARITHMETIC",null,null],
+    ["    EVALUATE TRUE",null,null],
+    ["        WHEN WS-OPERAND-A > WS-MAX-OPERAND",null,["m_oor_a","m_oor_b","m_zero","m_ok","m_prec","m_ovf"]],
+    ["          OR WS-OPERAND-A < WS-MIN-OPERAND",null,["m_oor_a","m_oor_b","m_zero","m_ok","m_prec","m_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-M01",["m_oor_a"]],
+    ["        WHEN WS-OPERAND-B > WS-MAX-OPERAND",null,["m_oor_b","m_zero","m_ok","m_prec","m_ovf"]],
+    ["          OR WS-OPERAND-B < WS-MIN-OPERAND",null,["m_oor_b","m_zero","m_ok","m_prec","m_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-M02",["m_oor_b"]],
+    ["        WHEN WS-OPERAND-A = ZERO OR WS-OPERAND-B = ZERO",null,["m_zero","m_ok","m_prec","m_ovf"]],
+    ["            MOVE ZERO TO WS-RESULT","BR-M03",["m_zero"]],
+    ["            SET STATUS-OK TO TRUE",null,["m_zero"]],
+    ["        WHEN OTHER",null,["m_ok","m_prec","m_ovf"]],
+    ["            MULTIPLY WS-OPERAND-A BY WS-OPERAND-B GIVING WS-RESULT ROUNDED",null,["m_ok","m_prec","m_ovf"]],
+    ["                ON SIZE ERROR","BR-M05",["m_ovf"]],
+    ["                    SET STATUS-OVERFLOW TO TRUE",null,["m_ovf"]],
+    ["                END-MULTIPLY",null,["m_ok","m_prec"]],
+    ["            IF STATUS-OK AND WS-RESULT = ZERO","BR-M06",["m_prec"]],
+    ["                SET STATUS-PRECISION-LOSS TO TRUE",null,["m_prec"]],
+    ["            END-IF",null,["m_ok","m_prec"]],
+    ["    END-EVALUATE.",null,null]
+  ],
+  DIV:[
+    ["*    BOUNDARY CHECKS BEFORE ARITHMETIC",null,null],
+    ["    EVALUATE TRUE",null,null],
+    ["        WHEN WS-OPERAND-A > WS-MAX-OPERAND",null,["d_oor_a","d_oor_b","d_div0","d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["          OR WS-OPERAND-A < WS-MIN-OPERAND",null,["d_oor_a","d_oor_b","d_div0","d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-D01",["d_oor_a"]],
+    ["        WHEN WS-OPERAND-B > WS-MAX-OPERAND",null,["d_oor_b","d_div0","d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["          OR WS-OPERAND-B < WS-MIN-OPERAND",null,["d_oor_b","d_div0","d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["            SET STATUS-OUT-OF-RANGE TO TRUE","BR-D02",["d_oor_b"]],
+    ["        WHEN WS-OPERAND-B = ZERO",null,["d_div0","d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["            SET STATUS-DIVIDE-BY-ZERO TO TRUE","BR-D03",["d_div0"]],
+    ["        WHEN FUNCTION ABS(WS-OPERAND-B) < WS-PRECISION-FLOOR",null,["d_prec","d_zeroA","d_ok","d_ovf"]],
+    ["            SET STATUS-PRECISION-LOSS TO TRUE","BR-D04",["d_prec"]],
+    ["        WHEN WS-OPERAND-A = ZERO",null,["d_zeroA","d_ok","d_ovf"]],
+    ["            MOVE ZERO TO WS-RESULT","BR-D05",["d_zeroA"]],
+    ["            SET STATUS-OK TO TRUE",null,["d_zeroA"]],
+    ["        WHEN OTHER",null,["d_ok","d_ovf"]],
+    ["            DIVIDE WS-OPERAND-A BY WS-OPERAND-B GIVING WS-RESULT ROUNDED",null,["d_ok","d_ovf"]],
+    ["                REMAINDER WS-REMAINDER",null,["d_ok","d_ovf"]],
+    ["                ON SIZE ERROR","BR-D07",["d_ovf"]],
+    ["                    SET STATUS-OVERFLOW TO TRUE",null,["d_ovf"]],
+    ["                END-DIVIDE",null,["d_ok"]],
+    ["    END-EVALUATE.",null,null]
+  ],
+  INV:[
+    ["    EVALUATE TRUE",null,null],
+    ["        WHEN OP-ADD",null,null],
+    ["            PERFORM 3000-ADDITION-PARA",null,null],
+    ["        WHEN OP-SUBTRACT",null,null],
+    ["            PERFORM 3100-SUBTRACTION-PARA",null,null],
+    ["        WHEN OP-MULTIPLY",null,null],
+    ["            PERFORM 3200-MULTIPLY-PARA",null,null],
+    ["        WHEN OP-DIVIDE",null,null],
+    ["            PERFORM 3300-DIVIDE-PARA",null,null],
+    ["        WHEN OTHER","BR-I01",["inv_op"]],
+    ["            SET STATUS-INVALID-OPERATION TO TRUE",null,["inv_op"]],
+    ["    END-EVALUATE.",null,null]
+  ]
+};
+
+/* ================================================================
+   VIEW A — program-level overview tree
+   ================================================================ */
+const funcColor = {};
+const opDrillMap = { "Addition":"ADD","Subtraction":"SUB","Multiplication":"MUL","Division":"DIV","Invalid operation":"INV" };
+
+const dataA = {
+  p:"PARAGRAPH", c:"0000-MAIN-PARA",
+  children:[
+    { p:"1000-INIT", c:"INITIALIZE COUNTERS", children:[
+      { p:"PERFORM", c:"1000-INITIALIZE", children:[
+        { p:"INIT", c:"PASS/FAIL RESET", f:"Initialization" }
+      ]}
+    ]},
+    { p:"2000-RUN-CASE", c:"EVALUATE WS-OP-CODE", children:[
+      { p:"WHEN 'A'", c:"OP-ADD", children:[
+        { p:"3000-ADDITION", c:"ADD A + B", f:"Addition" }
+      ]},
+      { p:"WHEN 'S'", c:"OP-SUBTRACT", children:[
+        { p:"3100-SUBTRACT", c:"SUB A - B", f:"Subtraction" }
+      ]},
+      { p:"WHEN 'M'", c:"OP-MULTIPLY", children:[
+        { p:"3200-MULTIPLY", c:"MUL A × B", f:"Multiplication" }
+      ]},
+      { p:"WHEN 'D'", c:"OP-DIVIDE", children:[
+        { p:"3300-DIVIDE", c:"DIV A ÷ B", f:"Division" }
+      ]},
+      { p:"WHEN OTHER", c:"INVALID OP", children:[
+        { p:"STATUS-30", c:"SET INVALID", f:"Invalid operation" }
+      ]}
+    ]},
+    { p:"4000-REPORT", c:"PASS / FAIL CHECK", children:[
+      { p:"IF STATUS=", c:"EXPECTED-STATUS", children:[
+        { p:"THEN", c:"ADD PASS-COUNT", f:"Test pass" },
+        { p:"ELSE", c:"ADD FAIL-COUNT", f:"Test fail" }
+      ]}
+    ]},
+    { p:"9000-SUMMARY", c:"DISPLAY TOTALS", children:[
+      { p:"DISPLAY", c:"RUN/PASS/FAIL", f:"Summary report" }
+    ]}
+  ]
+};
+
+const TA = makeTree(document.getElementById("svg"), dataA, {
+  boxW:110, boxH:38, gapX:7, levelH:94, padX:80, padTop:14, padBot:10,
+  levels:[["Level 1",""],["Level 2","paragraph"],["Level 3","condition"],["Level 4","branch"]],
+  onLeaf: node => selectA(node.f)
+});
+const { leaves:leavesA, strands:strandsA, nodeEls:nodeElsA } = TA;
+const svgA = document.getElementById("svg");
+
+const funcsA = {};
+leavesA.forEach((l, i) => (funcsA[l.f] = funcsA[l.f] || []).push(i));
+const namesA = Object.keys(funcsA);
+namesA.forEach((n, i) => funcColor[n] = palette[i % palette.length]);
+
+const chipsDiv = document.getElementById("chips");
+const chipEls  = {};
+namesA.forEach(n => addChip(chipsDiv, chipEls, n, n, funcColor[n], "", k => selectA(k)));
+addChip(chipsDiv, chipEls, "Show all", "__all__", "#374151", "all", k => selectA(k));
+
+/* delegated drill-button click on the info box — survives innerHTML replacement */
+document.getElementById("info").addEventListener("click", function(e) {
+  const btn = e.target.closest("button.drill");
+  if (btn) { currentOp = btn.dataset.op; showView("B"); }
+});
+
+const pathHtmlA = leaf => leaf.path.slice(1).map(n => n.depth === 1 ? n.p : `${n.p} ${n.c}`).join(" → ");
+
+function selectA(name) {
+  const all = name === "__all__";
+  const on  = new Set(all ? leavesA.map((_,i)=>i) : name ? funcsA[name] : []);
+  const lc  = i => all ? funcColor[leavesA[i].f] : funcColor[name];
+  svgA.classList.toggle("dim", on.size > 0);
+
+  strandsA.forEach((segs,i) => segs.forEach(s => {
+    const hl = on.has(i);
+    s.base.classList.toggle("on", hl);
+    s.flow.classList.toggle("on", hl);
+    s.base.style.stroke = hl ? lc(i) : "";
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${lc(i)})` : "";
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  const nc = new Map();
+  on.forEach(i => leavesA[i].path.forEach(n => {
+    nc.set(n, all ? (n.children ? "#374151" : funcColor[n.f]) : funcColor[name]);
+  }));
+  nodeElsA.forEach((e, n) => {
+    const c = nc.get(n);
+    e.g.classList.toggle("on", !!c);
+    e.rect.style.fill   = c || "";
+    e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || "";
+    e.num.style.fill      = c || "";
+  });
+
+  Object.entries(chipEls).forEach(([k,b]) => b.classList.toggle("active", k === name));
+
+  const info = document.getElementById("info");
+  if (name && !all) {
+    const c = funcColor[name], hasOp = opDrillMap[name];
+    info.style.borderLeftColor = c;
+    info.style.background = c + "1f";
+    info.innerHTML = `<b style="color:${c}">${name}</b>` +
+      [...on].map(i => `<div>${pathHtmlA(leavesA[i])}</div>`).join("") +
+      (hasOp ? `<button class="drill" style="--c:${c}" data-op="${hasOp}">Drill into ${name} business rules &#9656;</button>` : "");
+  } else if (all) {
+    info.style.borderLeftColor = "#374151"; info.style.background = "#eef0f3";
+    info.innerHTML = "<b>All functionalities</b> – each path is drawn in its own colour";
+  } else {
+    info.style.borderLeftColor = "#c9ced6"; info.style.background = "#eef0f3";
+    info.innerHTML = "<b>No functionality selected</b> – pick one above";
+  }
+}
+selectA(null);
+
+/* ================================================================
+   VIEW B — operation drill-down
+   ================================================================ */
+let currentOp = "ADD";
+let TB = null, idxB = {}, curB = null;
+
+function renderViewB(opKey) {
+  const op = OPS[opKey];
+  if (!op) return;
+
+  /* breadcrumb + title */
+  const opLabels = { ADD:"Addition",SUB:"Subtraction",MUL:"Multiplication",DIV:"Division",INV:"Invalid Operation" };
+  document.getElementById("breadcrumb").innerHTML =
+    `0000-MAIN-PARA → 2000-RUN-TEST-CASE → <b>${op.paraName}</b> (business rules)`;
+  document.getElementById("codeSec-title").textContent = `COBOL – ${op.paraName}`;
+
+  /* rebuild SVG B */
+  const svgBEl = document.getElementById("svgB");
+  svgBEl.innerHTML = "";
+  TB = makeTree(svgBEl, op.treeData, {
+    boxW:112, boxH:38, gapX:7, levelH:90, padX:72, padTop:14, padBot:10,
+    levels:[["Level 1","paragraph"],["Level 2","rule group"],["Level 3","condition"],["Level 4","outcome"]],
+    onLeaf: node => {
+      const t = op.tests.find(t => t.leaves.includes(node.id));
+      const g = op.gapPaths.find(p => p.ids.includes(node.id));
+      selectB(op, t ? t.k : g ? g.k : null);
+    }
+  });
+  svgBEl.style.width = TB.width + "px";
+  idxB = {}; TB.leaves.forEach((l,i) => idxB[l.id] = i);
+
+  /* KPI cards */
+  const pct = (a,b) => b ? Math.round(100*a/b) : 0;
+  const col = v => v >= 90 ? "#16a34a" : v >= 70 ? "#d97706" : "#e11d48";
+  const bp = pct(op.coveredLeaf.size, op.leafIds.length);
+  const pp = pct(op.coveredPaths.length, op.paths.length);
+  const card = (v,k,bar,color) =>
+    `<div class="card"><div class="v" style="color:${color||"#1f2328"}">${v}</div><div class="k">${k}</div>` +
+    (bar!=null ? `<div class="bar"><i style="width:${bar}%;background:${col(bar)}"></i></div>` : "") + `</div>`;
+  document.getElementById("kpi").innerHTML =
+    card(op.leafIds.length, "Rule outcomes") +
+    card(`${op.coveredLeaf.size}/${op.leafIds.length} &nbsp;${bp}%`, "Outcome coverage", bp, col(bp)) +
+    card(`${op.coveredPaths.length}/${op.paths.length} &nbsp;${pp}%`, "Path coverage", pp, col(pp)) +
+    card(op.tests.length, "Test cases") +
+    card(op.gapPaths.length, "Uncovered outcomes", null, op.gapPaths.length ? "#e11d48" : "#16a34a");
+
+  /* chips B */
+  const chipsB   = document.getElementById("chipsB");
+  const chipElsB = {};
+  chipsB.innerHTML = "";
+  addChip(chipsB, chipElsB, "Coverage view", "__cov__", "#374151", "all", k => selectB(op, k));
+  op.tests.forEach(t => addChip(chipsB, chipElsB, `${t.k} ${t.n}`, t.k, t.color, "", k => selectB(op, k)));
+
+  /* business-rule table */
+  const pill    = (k,cls) => `<span class="pill ${cls}" data-k="${k}" style="cursor:pointer">${k}</span>`;
+  const scChip  = sc => `<span class="sc sc-${sc}">${sc}</span>`;
+  document.getElementById("brTable").innerHTML =
+    `<table class="br"><tr><th>Rule</th><th>Outcome</th><th>Status</th><th>Description</th><th>Covered by</th></tr>` +
+    op.leafIds.map(id => {
+      const node = op.D[id];
+      const ts   = op.tests.filter(t => t.leaves.includes(id));
+      return `<tr><td class="id">${node.br}</td><td class="id">${node.p}</td>` +
+        `<td>${scChip(node.sc)}</td><td>${node.d}</td><td>` +
+        (ts.length ? ts.map(t => pill(t.k,"ok")).join("") : `<span class="pill gap">NOT COVERED</span>`) + `</td></tr>`;
+    }).join("") + `</table>`;
+
+  /* paths panel */
+  const pathText = ids => ids.map(id => op.D[id] ? op.D[id].s : id).join(" → ");
+  document.getElementById("gapTitle").textContent =
+    `Outcomes: ${op.coveredPaths.length} covered, ${op.gapPaths.length} uncovered`;
+  document.getElementById("gaps").innerHTML =
+    op.gapPaths.map(p =>
+      `<div data-k="${p.k}"><b style="color:#e11d48">${p.k} &#10007;</b> ${pathText(p.ids)}</div>`).join("") +
+    op.coveredPaths.map(p =>
+      `<div data-k="${p.k}" style="color:#4b5563"><b style="color:#16a34a">${p.k} &#10003;</b> ${pathText(p.ids)} <span class="pill ok">${p.test.k}</span></div>`).join("");
+
+  ["brTable","gaps"].forEach(elId =>
+    document.getElementById(elId).addEventListener("click", e => {
+      const t = e.target.closest("[data-k]"); if (t) selectB(op, t.dataset.k);
+    }));
+
+  /* COBOL source lines */
+  const rawLines = SRC_BY_OP[opKey] || [];
+  const SRC = rawLines.map(r => ({ t:r[0], br:r[1], ids:r[2] }));
+  const codeDiv = document.getElementById("code");
+  codeDiv.innerHTML = "";
+  SRC.forEach((s,i) => {
+    s.cmt = /^\s*\*/.test(s.t);
+    s.nTests = s.ids ? op.tests.filter(t => s.ids.some(id => t.leaves.includes(id))).length : op.tests.length;
+    const d = document.createElement("div");
+    d.innerHTML = `<span class="no">${String(i+1).padStart(3,"0")}</span><span class="st"><i></i></span><span class="tx"></span><span class="meta"></span>`;
+    d.querySelector(".tx").textContent = s.t;
+    codeDiv.appendChild(d);
+    s.el = d;
+  });
+  document.getElementById("codeLg").innerHTML =
+    `<span class="lg"><i style="background:#16a34a"></i>covered<i style="background:#e11d48"></i>not covered</span>`;
+
+  /* coverage class helper (for tree nodes in coverage view) */
+  function covClass(nd) {
+    const ids = nd.leafIdx.map(i => TB.leaves[i].id);
+    const hit = ids.filter(id => op.coveredLeaf.has(id)).length;
+    return hit === ids.length ? "cov-ok" : hit === 0 ? "cov-gap" : "cov-part";
+  }
+
+  /* inner selectB — called when user picks a test/gap chip or clicks a leaf */
+  function selectB(op, key) {
+    const test  = op.tests.find(t => t.k === key);
+    const gap   = op.paths.find(p => p.k === key);
+    const sel   = test ? test.leaves : gap ? gap.ids : [];
+    const color = test ? test.color : "#e11d48";
+    curB = (test || gap) ? key : null;
+    const on = new Set(sel.map(id => idxB[id]).filter(i => i !== undefined));
+    const svgBEl = document.getElementById("svgB");
+    svgBEl.classList.toggle("dim", on.size > 0);
+
+    TB.strands.forEach((segs,i) => segs.forEach(s => {
+      const hl = on.has(i), cv = op.coveredLeaf.has(TB.leaves[i].id);
+      s.base.classList.toggle("on", hl);
+      s.flow.classList.toggle("on", hl);
+      s.base.style.filter = hl ? `drop-shadow(0 0 3px ${color})` : "";
+      if (on.size) {
+        s.base.style.stroke = hl ? color : "";
+        s.base.style.strokeWidth = ""; s.base.style.strokeDasharray = "";
+      } else {
+        s.base.style.stroke = cv ? "#16a34a" : "#e11d48";
+        s.base.style.strokeWidth = "2.5";
+        s.base.style.strokeDasharray = cv ? "" : "5 4";
+      }
+      if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+    }));
+
+    const nc = new Map(), nn = new Map(); let n = 0;
+    sel.forEach(id => {
+      const idx = idxB[id]; if (idx === undefined) return;
+      TB.leaves[idx].path.forEach(nd => { if (!nn.has(nd)) nn.set(nd,++n); nc.set(nd,color); });
+    });
+    TB.nodeEls.forEach((e,nd) => {
+      const c = nc.get(nd);
+      e.g.classList.toggle("on", !!c);
+      e.rect.style.fill = c||""; e.rect.style.stroke = c||"";
+      e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+      e.circle.style.stroke = c||""; e.num.style.fill = c||"";
+      e.num.textContent = nn.get(nd) || "";
+      e.g.classList.remove("cov-ok","cov-gap","cov-part");
+      if (!on.size) e.g.classList.add(covClass(nd));
+    });
+
+    /* paint source code */
+    const onSet = new Set(sel); let step = 0, first = null;
+    SRC.forEach(s => {
+      const d = s.el, iEl = d.querySelector(".st i"), meta = d.querySelector(".meta");
+      d.className = "cl" + (s.cmt ? " cmt" : "");
+      d.style.background = ""; d.style.borderLeftColor = "";
+      iEl.textContent = ""; iEl.style.background = "";
+      meta.innerHTML = s.br ? `<span>${s.br}</span>` : "";
+      if (sel.length) {
+        const hit = !s.ids || s.ids.some(id => onSet.has(id));
+        if (hit) {
+          d.classList.add("sel");
+          d.style.background = color + "26"; d.style.borderLeftColor = color;
+          if (!s.cmt) { iEl.textContent = ++step; iEl.style.background = color; }
+          if (!first) first = d;
+        } else d.classList.add("skip");
+      } else {
+        const cv = !s.ids || s.ids.some(id => op.coveredLeaf.has(id));
+        d.classList.add(cv ? "c-ok" : "c-gap");
+        if (!s.cmt) meta.innerHTML += `<span>${s.nTests} test${s.nTests===1?"":"s"}</span>`;
+        if (!cv) meta.innerHTML += `<span style="background:#e11d48;color:#fff">NOT COVERED</span>`;
+      }
+    });
+    codeDiv.scrollTop = first ? Math.max(0, first.offsetTop - 6) : 0;
+
+    /* sync chips */
+    document.querySelectorAll("#chipsB button").forEach(b =>
+      b.classList.toggle("active",
+        b.textContent.startsWith(curB || "") && (curB ? b.textContent.startsWith(curB) : b.classList.contains("all"))));
+    document.querySelectorAll("#gaps [data-k]").forEach(d =>
+      d.classList.toggle("active", d.dataset.k === curB));
+
+    const infoB = document.getElementById("infoB");
+    if (test) {
+      infoB.style.borderLeftColor = color; infoB.style.background = color + "1f";
+      infoB.innerHTML = `<b style="color:${color}">${test.k} – ${test.n}</b>` +
+        `<span class="tag" style="background:${test.sc==="00"?"#16a34a":"#e11d48"}">${test.res}</span>` +
+        `<span class="sc sc-${test.sc}">STATUS ${test.sc}</span>` +
+        `<div>path: ${test.leaves.map(id => op.D[id]?op.D[id].s:id).join(" → ")}</div>` +
+        `<div>rules: ${test.leaves.map(id => op.D[id]?op.D[id].br:id).join(", ")}</div>` +
+        `<div>input: ${test.inp}</div>`;
+    } else if (gap) {
+      infoB.style.borderLeftColor = "#e11d48"; infoB.style.background = "#e11d481f";
+      infoB.innerHTML = `<b style="color:#e11d48">${gap.k} – uncovered outcome</b>` +
+        `<span class="tag" style="background:#e11d48">NO TEST</span>` +
+        `<div>outcome: ${gap.ids.map(id => op.D[id]?op.D[id].s:id).join(" → ")}</div>` +
+        `<div>No test exercises this outcome – add a test case.</div>`;
+    } else {
+      infoB.style.borderLeftColor = "#374151"; infoB.style.background = "#eef0f3";
+      infoB.innerHTML = `<b>Coverage view</b> – green = covered by a test &middot; red dashed = never exercised &middot; amber = partially covered. ` +
+        `Pick a test above or an uncovered outcome on the right.`;
+    }
+  }
+
+  /* expose selectB so chip/panel clicks work after renderViewB */
+  window._selectB = key => selectB(op, key);
+  /* wire chips (re-wired after innerHTML clear) using delegation */
+  document.getElementById("chipsB").addEventListener("click", function chipsHandler(e) {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const key = [...Object.entries({})]  /* dummy — real logic below */ ;
+    /* find key from button text prefix matching test keys */
+    const tk = op.tests.find(t => btn.textContent.startsWith(t.k));
+    if (tk) { selectB(op, btn.classList.contains("active") ? null : tk.k); return; }
+    if (btn.classList.contains("all")) selectB(op, btn.classList.contains("active") ? null : "__cov__");
+  }, { once:true }); /* each renderViewB adds one listener via closure */
+
+  selectB(op, null);
+}
+
+/* ================================================================
+   View switching
+   ================================================================ */
+function showView(v) {
+  document.getElementById("viewA").hidden = v !== "A";
+  document.getElementById("viewB").hidden = v !== "B";
+  const opName = { ADD:"Addition",SUB:"Subtraction",MUL:"Multiplication",DIV:"Division",INV:"Invalid Operation" }[currentOp] || "";
+  document.getElementById("title").textContent =
+    v === "B"
+      ? `CALCOPS1 – ${opName} – Business Rules & Path Coverage`
+      : "CALCOPS1 – Business Rules & Functionality Path Highlighter";
+  document.getElementById("subtitle").innerHTML =
+    v === "B"
+      ? `Drill-down into <b>${OPS[currentOp]?.paraName}</b>. Each leaf is one business-rule outcome; each test exercises one path.`
+      : "Click an operation below to highlight its execution path through paragraph → condition → outcome. Click a leaf box directly too. Numbered badges show execution order.";
+  if (v === "B") renderViewB(currentOp);
+}
+
+document.getElementById("back").addEventListener("click", () => showView("A"));
+</script>
+</body>
+</html>

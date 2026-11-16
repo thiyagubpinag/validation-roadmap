@@ -1,0 +1,27 @@
+# ZAPP - Z APPlication configuration file
+# Reference: https://ibm.github.io/zopeneditor-about/Docs/zapp.html
+# Reference: https://ibm.github.io/zopeneditor-about/Docs/setting_propertygroup.html
+name: my-project
+description: Property groups for IBM Z Open Editor
+version: "1.0.0"
+propertyGroups:
+    # ── COBOL ────────────────────────────────────────────────────────────────
+    # syslib   : default COPY resolution
+    - name: cobol-local
+      language: cobol
+      libraries:
+          - name: syslib
+            type: local
+            locations: [] # TODO: replace [] with path(s) once copybook directory exists, e.g. - "copybooks"
+
+profiles:
+    # ── Analysis profile ───────────────────────────────────────────────────
+    # cobol-scope → .cbl / .cob source directories
+    - name: my-analysis
+      type: analysis
+      settings:
+          analysisScope:
+              - name: cobol-scope
+                locations:
+                    - "cobol"
+          containsCics: true

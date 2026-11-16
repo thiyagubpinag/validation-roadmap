@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>COBOL Functionality Path Highlighter</title>
+<style>
+  html, body { height:100%; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:#f7f8fa; color:#1f2328; display:flex; flex-direction:column; overflow:hidden; }
+  h1 { font-size:17px; margin:10px 16px 2px; }
+  p.sub { margin:0 16px 8px; color:#57606a; font-size:12px; }
+  .view { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  .view[hidden] { display:none; }
+  .chips { flex:none; display:flex; flex-wrap:wrap; gap:7px; margin:0 16px 8px; }
+  .chips button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 12px; border:2px solid var(--c, #c9ced6); border-radius:16px; background:#fff; color:var(--c, #1f2328); cursor:pointer; transition:all .15s; }
+  .chips button:hover { background:var(--c); color:#fff; transform:translateY(-1px); }
+  .chips button.active { background:var(--c); color:#fff; box-shadow:0 3px 10px var(--c); }
+  .chips button.all { --c:#374151; }
+  .info { flex:none; margin:0 16px 4px; padding:7px 12px; font-size:12.5px; border-left:5px solid #c9ced6; background:#eef0f3; border-radius:4px; font-family:ui-monospace,Menlo,Consolas,monospace; color:#374151; transition:all .2s; }
+  .info b { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-size:13px; margin-right:6px; }
+  .info div { margin-top:2px; }
+  .info .tag { display:inline-block; font:700 10.5px -apple-system,"Segoe UI",sans-serif; padding:1px 7px; border-radius:9px; color:#fff; margin-right:6px; }
+  .info button.drill { margin-top:6px; font:700 12px -apple-system,"Segoe UI",sans-serif; padding:4px 12px; border:0; border-radius:14px; background:var(--c); color:#fff; cursor:pointer; }
+  .info button.drill:hover { filter:brightness(1.12); }
+  .wrap { flex:1 1 auto; min-height:0; padding:0 8px 8px; }
+  .wrap svg { width:100%; height:100%; display:block; }
+
+  .strand { fill:none; stroke-linecap:round; stroke:#cfd4db; stroke-width:1.5; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .dim .strand:not(.on) { opacity:.35; }
+  .strand.on { stroke-width:6; }
+  .flow { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-dasharray:1 13; opacity:0; pointer-events:none; }
+  .flow.on { opacity:.9; animation:flow 0.9s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-14; } }
+
+  .lvl { font-size:9px; fill:#57606a; font-weight:600; }
+  .node rect { fill:#fff; stroke:#cfd4db; stroke-width:1.5; transition:fill .25s, stroke .25s; }
+  .node text { fill:#9aa1ab; transition:fill .25s; }
+  .node .l1 { font-size:8.5px; font-weight:700; letter-spacing:.02em; }
+  .node .l2 { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:9.5px; }
+  .node.leaf { cursor:pointer; }
+  .node.leaf:hover rect { stroke:#6b7280; }
+  .dim .node:not(.on) { opacity:.45; }
+  .node.on rect { stroke-width:2.5; }
+  .node.on text { fill:#fff; }
+  .node.on .l1 { opacity:.85; }
+  .badge circle { fill:#fff; stroke-width:2; }
+  .badge text { font-size:8px; font-weight:800; text-anchor:middle; }
+  .badge { display:none; }
+  .node.on .badge { display:block; }
+
+  /* ---- drill-down view ---- */
+  #topbar { flex:none; display:flex; align-items:center; gap:8px; margin:0 16px 6px; font-size:12px; color:#57606a; }
+  #topbar button { font:700 12px -apple-system,"Segoe UI",sans-serif; padding:4px 11px; border:1.5px solid #374151; border-radius:14px; background:#fff; color:#374151; cursor:pointer; }
+  #topbar button:hover { background:#374151; color:#fff; }
+  #kpi { flex:none; display:flex; gap:10px; margin:0 16px 8px; flex-wrap:wrap; }
+  .card { background:#fff; border:1px solid #d8dce2; border-radius:6px; padding:6px 14px; min-width:130px; }
+  .card .v { font-size:20px; font-weight:800; }
+  .card .k { font-size:10.5px; color:#57606a; text-transform:uppercase; letter-spacing:.04em; }
+  .bar { height:5px; border-radius:3px; background:#e5e7eb; margin-top:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; }
+  #wrapB { flex:none; overflow-x:auto; overflow-y:hidden; padding:0 8px 6px; }
+  #svgB { width:1560px; min-width:100%; display:block; height:auto; }
+  #codeSec { margin:0 16px 12px; background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:hidden; }
+  #codeSec h2 { margin:0; padding:6px 10px; font-size:11.5px; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; display:flex; gap:14px; align-items:center; }
+  #codeSec h2 .lg { font-weight:400; font-size:10.5px; color:#57606a; }
+  #codeSec h2 .lg i { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 8px; vertical-align:-1px; }
+  #code { max-height:330px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; position:relative; }
+  .cl { display:flex; align-items:center; white-space:pre; border-left:4px solid transparent; padding:1px 0; color:#9aa1ab; transition:background .2s, color .2s; }
+  .cl .no { flex:none; width:38px; text-align:right; margin-right:8px; color:#c0c5cc; }
+  .cl .st { flex:none; width:26px; text-align:center; font:800 9px -apple-system,sans-serif; }
+  .cl .st i { display:none; font-style:normal; color:#fff; border-radius:8px; padding:1px 5px; }
+  .cl .tx { flex:1 1 auto; min-width:0; }
+  .cl .meta { flex:none; padding:0 10px; font:700 10px -apple-system,sans-serif; display:flex; gap:6px; }
+  .cl .meta span { border-radius:8px; padding:0 6px; background:#eef0f3; color:#57606a; }
+  .cl.cmt .tx { font-style:italic; }
+  .cl.sel { color:#111; font-weight:600; }
+  .cl.sel .st i { display:inline-block; }
+  .cl.sel.cmt { font-weight:400; }
+  .cl.skip { opacity:.38; }
+  .cl.c-ok { color:#374151; border-left-color:#16a34a; }
+  .cl.c-gap { color:#9f1239; background:#fff1f2; border-left-color:#e11d48; }
+  .cl.always { color:#374151; }
+  #viewB { overflow:auto; }
+  #viewB > * { flex:none; }
+  #panel { height:320px; display:grid; grid-template-columns:1.25fr 1fr; gap:12px; margin:0 16px 14px; }
+  #panel section { background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:auto; }
+  #panel h2 { position:sticky; top:0; margin:0; padding:6px 10px; font-size:11.5px; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; }
+  table.br { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.br th { text-align:left; font-size:10.5px; color:#57606a; padding:4px 8px; border-bottom:1px solid #e5e7eb; }
+  table.br td { padding:4px 8px; border-bottom:1px solid #f0f1f3; vertical-align:top; }
+  table.br td.id { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; white-space:nowrap; }
+  .pill { display:inline-block; font:700 10px ui-monospace,Menlo,Consolas,monospace; padding:1px 6px; border-radius:8px; margin:1px 2px 1px 0; }
+  .pill.ok { background:#dcfce7; color:#166534; }
+  .pill.gap { background:#ffe4e6; color:#9f1239; }
+  .gaps { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; }
+  .gaps div { padding:3px 10px; border-bottom:1px solid #f0f1f3; cursor:pointer; white-space:nowrap; }
+  .gaps div:hover { background:#fff1f2; }
+  .gaps div.active { background:#ffe4e6; font-weight:700; }
+
+  /* coverage colouring */
+  .node.cov-ok rect { fill:#dcfce7; stroke:#16a34a; }
+  .node.cov-gap rect { fill:#fff1f2; stroke:#e11d48; stroke-dasharray:4 3; }
+  .node.cov-part rect { fill:#fef3c7; stroke:#d97706; }
+  .node.cov-ok text, .node.cov-gap text, .node.cov-part text { fill:#1f2328; }
+</style>
+</head>
+<body>
+<h1 id="title">COBOL program – functionality path highlighter</h1>
+<p class="sub" id="subtitle">Click a functionality to light up the path through paragraph &rarr; condition &rarr; branch. Numbered badges show the order of execution. You can also click a bottom-level box.</p>
+
+<section class="view" id="viewA">
+  <div class="chips" id="chips"></div>
+  <div class="info" id="info"></div>
+  <div class="wrap"><svg id="svg" preserveAspectRatio="xMidYMin meet"></svg></div>
+</section>
+
+<section class="view" id="viewB" hidden>
+  <div id="topbar"><button id="back">&larr; Program overview</button>
+    <span>2000-PROCESS &rarr; IF REC-TYPE = 'D' &rarr; THEN PERFORM DETAIL &rarr; <b>3000-DETAIL</b> (business rules)</span></div>
+  <div id="kpi"></div>
+  <div class="chips" id="chipsB"></div>
+  <div class="info" id="infoB"></div>
+  <div id="wrapB"><svg id="svgB"></svg></div>
+  <div id="codeSec">
+    <h2>COBOL &ndash; 3000-DETAIL <span class="lg" id="codeLg"></span></h2>
+    <div id="code"></div>
+  </div>
+  <div id="panel">
+    <section><h2>Business rules in 3000-DETAIL <span style="font-weight:400">(illustrative)</span></h2><div id="brTable"></div></section>
+    <section><h2 id="gapTitle">Uncovered end-to-end paths</h2><div class="gaps" id="gaps"></div></section>
+  </div>
+</section>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+
+/* Generic tree renderer: leaves get sequential x, parents centred over children.
+   o = { boxW, boxH, gapX, levelH, padX, padTop, padBot, levels:[[a,b]..], onLeaf(node) } */
+function makeTree(svg, data, o) {
+  const { boxW, boxH, gapX, levelH, padX, padTop, padBot } = o;
+  const leaves = [];
+  (function layout(node, depth, parents) {
+    node.depth = depth;
+    node.y = padTop + depth * levelH;
+    if (!node.children) {
+      node.leafIdx = [leaves.length];
+      node.cx = padX + boxW / 2 + leaves.length * (boxW + gapX);
+      node.path = [...parents, node];
+      leaves.push(node);
+      return;
+    }
+    node.children.forEach(c => layout(c, depth + 1, [...parents, node]));
+    node.leafIdx = node.children.flatMap(c => c.leafIdx);
+    node.cx = (node.children[0].cx + node.children[node.children.length - 1].cx) / 2;
+  })(data, 0, []);
+
+  const width = padX + leaves.length * (boxW + gapX) - gapX + 8;
+  const height = padTop + Math.max(...leaves.map(l => l.depth)) * levelH + boxH + padBot;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  o.levels.forEach(([a, b], d) => {
+    const y = padTop + d * levelH + boxH / 2;
+    el("text", { class: "lvl", x: 4, y: y - 1 }, svg).textContent = a;
+    el("text", { class: "lvl", x: 4, y: y + 10, "font-weight": 400 }, svg).textContent = b;
+  });
+
+  const slotX = (node, li) => {
+    const n = node.leafIdx.length, k = node.leafIdx.indexOf(li);
+    return node.cx - boxW / 2 + 8 + (boxW - 16) * (k + 0.5) / n;
+  };
+  const strandG = el("g", {}, svg), nodeG = el("g", {}, svg);
+
+  // one base line + one animated "flow" overlay per path segment
+  const strands = leaves.map((leaf, i) => {
+    const els = [];
+    for (let d = 0; d < leaf.path.length - 1; d++) {
+      const a = leaf.path[d], b = leaf.path[d + 1];
+      const x1 = slotX(a, i), y1 = a.y + boxH, x2 = slotX(b, i), y2 = b.y, my = (y1 + y2) / 2;
+      const dd = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+      els.push({ base: el("path", { class: "strand", d: dd }, strandG),
+                 flow: el("path", { class: "flow", d: dd }, strandG) });
+    }
+    return els;
+  });
+
+  const nodeEls = new Map();
+  (function draw(node) {
+    const isLeaf = !node.children;
+    const g = el("g", { class: "node" + (isLeaf ? " leaf" : "") }, nodeG);
+    const rect = el("rect", { x: node.cx - boxW / 2, y: node.y, width: boxW, height: boxH, rx: 5 }, g);
+    el("text", { class: "l1", x: node.cx, y: node.y + 15, "text-anchor": "middle" }, g).textContent = node.p;
+    el("text", { class: "l2", x: node.cx, y: node.y + 29, "text-anchor": "middle" }, g).textContent = node.c;
+    if (node.exit) el("rect", { x: node.cx - boxW / 2 + 5, y: node.y + boxH - 3, width: boxW - 10, height: 2, rx: 1, fill: "#e11d48" }, g);
+    const bd = el("g", { class: "badge" }, g);
+    const circle = el("circle", { cx: node.cx - boxW / 2, cy: node.y, r: 7 }, bd);
+    const num = el("text", { x: node.cx - boxW / 2, y: node.y + 3 }, bd);
+    num.textContent = node.depth + 1;
+    nodeEls.set(node, { g, rect, circle, num, bd });
+    if (isLeaf) g.addEventListener("click", () => o.onLeaf && o.onLeaf(node));
+    else node.children.forEach(draw);
+  })(data);
+
+  return { leaves, strands, nodeEls, width, height };
+}
+
+/* =====================  VIEW A – program overview  ===================== */
+// p = first line (paragraph name or construct type), c = second line (condition / action)
+// f = functionality implemented by this leaf (only on leaves)
+const data = {
+  p: "PARAGRAPH", c: "0000-MAINLINE",
+  children: [
+    { p: "1000-INIT", c: "IF OPEN-OK", children: [
+      { p: "IF", c: "INPUT-FS = '00'", children: [
+        { p: "THEN", c: "PERFORM READ",  f: "Read input" },
+        { p: "ELSE", c: "PERFORM ABEND", f: "Abend handling" } ] },
+      { p: "EVALUATE", c: "PARM-MODE", children: [
+        { p: "WHEN", c: "'B' BATCH-RUN", f: "Batch run" },
+        { p: "WHEN OTHER", c: "ONLINE-RUN", f: "Online run" } ] }
+    ]},
+    { p: "2000-PROCESS", c: "UNTIL EOF = 'Y'", children: [
+      { p: "IF", c: "REC-TYPE = 'D'", children: [
+        { p: "THEN", c: "PERFORM DETAIL", f: "Detail record" },
+        { p: "ELSE", c: "PERFORM HEADER", f: "Header record" } ] },
+      { p: "IF", c: "BALANCE < 0", children: [
+        { p: "THEN", c: "PERFORM NSF",  f: "Overdraft (NSF)" },
+        { p: "ELSE", c: "PERFORM POST", f: "Post transaction" } ] }
+    ]},
+    { p: "9000-TERMINATE", c: "IF RETURN-CODE = 0", children: [
+      { p: "IF", c: "REC-CNT > 0", children: [
+        { p: "THEN", c: "PERFORM SUMMARY", f: "Summary report" },
+        { p: "ELSE", c: "DISPLAY NO-DATA", f: "No-data message" } ] },
+      { p: "EVALUATE", c: "RETURN-CODE", children: [
+        { p: "WHEN", c: "0 CLOSE FILES", f: "Normal end" },
+        { p: "WHEN OTHER", c: "PERFORM ABEND", f: "Abend handling" } ] }
+    ]}
+  ]
+};
+
+const TA = makeTree(document.getElementById("svg"), data, {
+  boxW: 104, boxH: 38, gapX: 6, levelH: 92, padX: 74, padTop: 14, padBot: 10,
+  levels: [["Level 1", ""], ["Level 2", "paragraph"], ["Level 3", "condition"], ["Level 4", "branch"]],
+  onLeaf: node => selectA(node.f)
+});
+const { leaves, strands, nodeEls } = TA;
+const svg = document.getElementById("svg");
+
+// functionalities -> leaf indexes (a functionality can span several paths)
+const funcs = {};
+leaves.forEach((l, i) => (funcs[l.f] = funcs[l.f] || []).push(i));
+const names = Object.keys(funcs);
+const palette = ["#e11d48","#2563eb","#16a34a","#ea580c","#9333ea","#0891b2","#ca8a04","#db2777","#4f46e5","#0d9488"];
+const funcColor = {};
+names.forEach((n, i) => funcColor[n] = palette[i % palette.length]);
+
+const chipsDiv = document.getElementById("chips");
+const chipEls = {};
+function addChip(host, store, label, key, color, cls, handler) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.setProperty("--c", color);
+  if (cls) b.className = cls;
+  b.addEventListener("click", () => handler(store[key].classList.contains("active") ? null : key));
+  host.appendChild(b);
+  store[key] = b;
+}
+names.forEach(n => addChip(chipsDiv, chipEls, n, n, funcColor[n], "", k => selectA(k)));
+addChip(chipsDiv, chipEls, "Show all", "__all__", "#374151", "all", k => selectA(k));
+
+const info = document.getElementById("info");
+const pathHtml = leaf => leaf.path.slice(1).map(n => n.depth === 1 ? n.p : `${n.p} ${n.c}`).join(" → ");
+
+function selectA(name) {
+  const all = name === "__all__";
+  const on = new Set(all ? leaves.map((_, i) => i) : name ? funcs[name] : []);
+  const leafColor = i => all ? funcColor[leaves[i].f] : funcColor[name];
+
+  svg.classList.toggle("dim", on.size > 0);
+
+  strands.forEach((segs, i) => segs.forEach(s => {
+    const hl = on.has(i);
+    s.base.classList.toggle("on", hl);
+    s.flow.classList.toggle("on", hl);
+    s.base.style.stroke = hl ? leafColor(i) : "";
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${leafColor(i)})` : "";
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  // node -> colour (in "all" mode only leaves are coloured; shared nodes stay dark neutral)
+  const nodeColor = new Map();
+  on.forEach(i => leaves[i].path.forEach(n => {
+    if (!all) nodeColor.set(n, funcColor[name]);
+    else nodeColor.set(n, n.children ? "#374151" : funcColor[n.f]);
+  }));
+  nodeEls.forEach((e, n) => {
+    const c = nodeColor.get(n);
+    e.g.classList.toggle("on", !!c);
+    e.rect.style.fill = c || "";
+    e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || "";
+    e.num.style.fill = c || "";
+  });
+
+  Object.entries(chipEls).forEach(([k, b]) => b.classList.toggle("active", k === name));
+
+  if (name && !all) {
+    const c = funcColor[name];
+    info.style.borderLeftColor = c;
+    info.style.background = c + "1f";
+    info.innerHTML = `<b style="color:${c}">${name}</b>` +
+      [...on].map(i => `<div>${pathHtml(leaves[i])}</div>`).join("") +
+      (name === "Detail record"
+        ? `<button class="drill" style="--c:${c}" id="drill">Drill into Detail record business rules &#9656;</button>` : "");
+    const d = document.getElementById("drill");
+    if (d) d.addEventListener("click", () => showView("B"));
+  } else if (all) {
+    info.style.borderLeftColor = "#374151";
+    info.style.background = "#eef0f3";
+    info.innerHTML = "<b>All functionalities</b> – each path is drawn in its own colour";
+  } else {
+    info.style.borderLeftColor = "#c9ced6";
+    info.style.background = "#eef0f3";
+    info.innerHTML = "<b>No functionality selected</b> – pick one above";
+  }
+}
+selectA(null);
+
+/* VIEW B is appended below */
+
+/* =====================  VIEW B – Detail record drill-down (illustrative)  ===================== */
+// Every leaf is one business-rule outcome. s = short label, exit = record is rejected / paragraph ends here.
+const L = (id, p, c, br, s, d, exit) => ({ id, p, c, br, s, d, exit: !!exit });
+const D = {
+  v1y: L("v1y", "THEN", "CONTINUE",        "BR-01", "acct ok",        "ACCT-NO is numeric - continue validation"),
+  v1n: L("v1n", "ELSE", "REJECT E01",      "BR-02", "acct bad E01",   "ACCT-NO not numeric - reject record, error E01", 1),
+  v2y: L("v2y", "THEN", "CONTINUE",        "BR-03", "date ok",        "TXN-DATE is a valid calendar date - continue"),
+  v2n: L("v2n", "ELSE", "REJECT E02",      "BR-04", "date bad E02",   "TXN-DATE invalid - reject record, error E02", 1),
+  a1y: L("a1y", "THEN", "CONTINUE",        "BR-05", "amt>0",          "TXN-AMT is greater than zero - continue"),
+  a1n: L("a1n", "ELSE", "REJECT E03",      "BR-06", "amt<=0 E03",     "Zero or negative amount - reject record, error E03", 1),
+  a2y: L("a2y", "THEN", "FLAG AML REVIEW", "BR-07", "AML flag",       "Amount over 10,000 - set AML review flag, continue"),
+  a2n: L("a2n", "ELSE", "NO FLAG",         "BR-08", "no flag",        "Amount 10,000 or less - no review flag"),
+  sA:  L("sA",  "WHEN 'A'",   "ACTIVE - OK",  "BR-09", "active",      "Account status A (active) - continue"),
+  sF:  L("sF",  "WHEN 'F'",   "REJECT E05",   "BR-10", "frozen E05",  "Account status F (frozen) - reject, error E05", 1),
+  sC:  L("sC",  "WHEN 'C'",   "REJECT E06",   "BR-11", "closed E06",  "Account status C (closed) - reject, error E06", 1),
+  sO:  L("sO",  "WHEN OTHER", "REJECT E07",   "BR-12", "status? E07", "Unknown account status - reject, error E07", 1),
+  l1y: L("l1y", "THEN", "REJECT E04",      "BR-13", "over limit E04", "Amount exceeds DAILY-LMT - reject record, error E04", 1),
+  l1n: L("l1n", "ELSE", "ACCEPT",          "BR-14", "in limit",       "Amount within DAILY-LMT - accept"),
+  l2y: L("l2y", "THEN", "ADD FEE 2.50",    "BR-15", "fee",            "Withdrawal (TXN-TYPE = 'W') - add fee 2.50"),
+  l2n: L("l2n", "ELSE", "NO FEE",          "BR-16", "no fee",         "Other transaction type - no fee")
+};
+const leafNode = id => ({ id, p: D[id].p, c: D[id].c, exit: D[id].exit });
+const condNode = (p, c, ids) => ({ p, c, children: ids.map(leafNode) });
+
+const dataB = {
+  p: "PARAGRAPH", c: "3000-DETAIL",
+  children: [
+    { p: "VALIDATE-FIELDS", c: "BR-01 .. BR-04", children: [
+      condNode("IF", "ACCT-NO NUMERIC", ["v1y", "v1n"]),
+      condNode("IF", "TXN-DATE VALID",  ["v2y", "v2n"]) ] },
+    { p: "AMOUNT-RULES", c: "BR-05 .. BR-08", children: [
+      condNode("IF", "TXN-AMT > 0",     ["a1y", "a1n"]),
+      condNode("IF", "TXN-AMT > 10000", ["a2y", "a2n"]) ] },
+    { p: "STATUS-CHECK", c: "BR-09 .. BR-12", children: [
+      condNode("EVALUATE", "ACCT-STATUS", ["sA", "sF", "sC", "sO"]) ] },
+    { p: "LIMIT-CHECK", c: "BR-13 .. BR-16", children: [
+      condNode("IF", "AMT > DAILY-LMT", ["l1y", "l1n"]),
+      condNode("IF", "TXN-TYPE = 'W'",  ["l2y", "l2n"]) ] }
+  ]
+};
+
+// decision points in execution order; an "exit" outcome ends the paragraph
+const seqB = [["v1y", "v1n"], ["v2y", "v2n"], ["a1y", "a1n"], ["a2y", "a2n"], ["sA", "sF", "sC", "sO"], ["l1y", "l1n"], ["l2y", "l2n"]];
+const pathsB = [];
+(function walk(i, acc) {
+  if (i === seqB.length) { pathsB.push(acc); return; }
+  seqB[i].forEach(id => { const n = [...acc, id]; if (D[id].exit) pathsB.push(n); else walk(i + 1, n); });
+})(0, []);
+const paths = pathsB.map((ids, i) => ({ k: "P" + String(i + 1).padStart(2, "0"), ids, key: ids.join(">") }));
+
+// illustrative test cases (each one executes one end-to-end path)
+const tests = [
+  { k: "T01", n: "Happy path",            res: "Accepted",                    leaves: ["v1y","v2y","a1y","a2n","sA","l1n","l2n"], inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=250.00  STATUS=A  TYPE=D" },
+  { k: "T02", n: "Withdrawal fee",        res: "Accepted + fee 2.50",         leaves: ["v1y","v2y","a1y","a2n","sA","l1n","l2y"], inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=250.00  STATUS=A  TYPE=W" },
+  { k: "T03", n: "Large amount - AML",    res: "Accepted, flagged for review", leaves: ["v1y","v2y","a1y","a2y","sA","l1n","l2n"], inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=15000.00  DAILY-LMT=20000  STATUS=A  TYPE=D" },
+  { k: "T04", n: "Non-numeric account",   res: "Rejected E01",                leaves: ["v1n"],                                     inp: "ACCT-NO=12AB567890" },
+  { k: "T05", n: "Zero amount",           res: "Rejected E03",                leaves: ["v1y","v2y","a1n"],                         inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=0.00" },
+  { k: "T06", n: "Frozen account",        res: "Rejected E05",                leaves: ["v1y","v2y","a1y","a2n","sF"],              inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=250.00  STATUS=F" },
+  { k: "T07", n: "Over daily limit",      res: "Rejected E04",                leaves: ["v1y","v2y","a1y","a2n","sA","l1y"],        inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=9000.00  DAILY-LMT=5000  STATUS=A" },
+  { k: "T08", n: "Closed account",        res: "Rejected E06",                leaves: ["v1y","v2y","a1y","a2n","sC"],              inp: "ACCT-NO=1234567890  TXN-DATE=2025-01-15  TXN-AMT=250.00  STATUS=C" }
+];
+tests.forEach((t, i) => { t.color = palette[i % palette.length]; t.key = t.leaves.join(">"); });
+
+// coverage maths
+const coveredLeaf = new Set(tests.flatMap(t => t.leaves));
+paths.forEach(p => { p.test = tests.find(t => t.key === p.key) || null; });
+const coveredPaths = paths.filter(p => p.test), gapPaths = paths.filter(p => !p.test);
+const leafIds = Object.keys(D);
+tests.forEach(t => { if (!paths.some(p => p.key === t.key)) console.warn("test is not a valid path:", t.k); });
+
+const svgB = document.getElementById("svgB");
+const TB = makeTree(svgB, dataB, {
+  boxW: 108, boxH: 38, gapX: 6, levelH: 88, padX: 70, padTop: 14, padBot: 10,
+  levels: [["Level 1", "paragraph"], ["Level 2", "rule group"], ["Level 3", "condition"], ["Level 4", "outcome"]],
+  onLeaf: node => selectB(testOfLeaf(node.id))
+});
+svgB.style.width = TB.width + "px";
+const idxB = {}; TB.leaves.forEach((l, i) => idxB[l.id] = i);
+const testOfLeaf = id => { const t = tests.find(t => t.leaves.includes(id)); return t ? t.k : (gapPaths.find(p => p.ids.includes(id)) || {}).k || null; };
+
+// KPI cards
+(function () {
+  const pct = (a, b) => Math.round(100 * a / b);
+  const col = v => v >= 90 ? "#16a34a" : v >= 70 ? "#d97706" : "#e11d48";
+  const bp = pct(coveredLeaf.size, leafIds.length), pp = pct(coveredPaths.length, paths.length);
+  const card = (v, k, bar, color) => `<div class="card"><div class="v" style="color:${color || "#1f2328"}">${v}</div><div class="k">${k}</div>` +
+    (bar != null ? `<div class="bar"><i style="width:${bar}%;background:${col(bar)}"></i></div>` : "") + `</div>`;
+  document.getElementById("kpi").innerHTML =
+    card(leafIds.length, "Business-rule outcomes") +
+    card(`${coveredLeaf.size}/${leafIds.length} &nbsp;${bp}%`, "Branch coverage", bp, col(bp)) +
+    card(`${coveredPaths.length}/${paths.length} &nbsp;${pp}%`, "Path coverage", pp, col(pp)) +
+    card(tests.length, "Test cases") +
+    card(gapPaths.length, "Uncovered paths", null, "#e11d48") +
+    `<div class="card" style="flex:1 1 260px;font-size:11.5px;color:#374151;align-self:stretch"><b>Why paths matter:</b> every branch is hit except ` +
+    `${leafIds.length - coveredLeaf.size}, yet ${gapPaths.length} of ${paths.length} rule combinations have never been run. ` +
+    `Rules interact (e.g. AML flag &times; status &times; limit), so branch coverage alone hides the gaps.</div>`;
+})();
+
+// chips
+const chipsB = document.getElementById("chipsB"), chipElsB = {};
+addChip(chipsB, chipElsB, "Coverage view", "__cov__", "#374151", "all", k => selectB(k));
+tests.forEach(t => addChip(chipsB, chipElsB, `${t.k} ${t.n}`, t.k, t.color, "", k => selectB(k)));
+
+// business-rule table + path list
+const pill = (k, cls) => `<span class="pill ${cls}" data-k="${k}" style="cursor:pointer">${k}</span>`;
+document.getElementById("brTable").innerHTML =
+  `<table class="br"><tr><th>Rule</th><th>Outcome</th><th>Business rule</th><th>Covered by</th></tr>` +
+  leafIds.map(id => {
+    const ts = tests.filter(t => t.leaves.includes(id));
+    return `<tr><td class="id">${D[id].br}</td><td class="id">${D[id].p}</td><td>${D[id].d}</td><td>` +
+      (ts.length ? ts.map(t => pill(t.k, "ok")).join("") : `<span class="pill gap">NOT COVERED</span>`) + `</td></tr>`;
+  }).join("") + `</table>`;
+const pathText = ids => ids.map(i => D[i].s).join(" &rarr; ");
+document.getElementById("gapTitle").textContent = `End-to-end paths: ${coveredPaths.length} covered, ${gapPaths.length} uncovered`;
+document.getElementById("gaps").innerHTML =
+  gapPaths.map(p => `<div data-k="${p.k}"><b style="color:#e11d48">${p.k} &#10007;</b> ${pathText(p.ids)}</div>`).join("") +
+  coveredPaths.map(p => `<div data-k="${p.k}" style="color:#4b5563"><b style="color:#16a34a">${p.k} &#10003;</b> ${pathText(p.ids)} <span class="pill ok">${p.test.k}</span></div>`).join("");
+["brTable", "gaps"].forEach(id => document.getElementById(id).addEventListener("click", e => {
+  const t = e.target.closest("[data-k]"); if (t) selectB(t.dataset.k);
+}));
+
+const infoB = document.getElementById("infoB");
+const covClass = n => {
+  const ids = n.leafIdx.map(i => TB.leaves[i].id), hit = ids.filter(i => coveredLeaf.has(i)).length;
+  return hit === ids.length ? "cov-ok" : hit === 0 ? "cov-gap" : "cov-part";
+};
+/* ---------- COBOL source of 3000-DETAIL (illustrative) ----------
+   Each line carries the outcome ids it belongs to: a line is executed by a path when the path contains
+   any of its ids. ids = null means the line is always executed. */
+const G = {
+  v: ["v1y","v1n","v2y","v2n"], a: ["a1y","a1n","a2y","a2n"],
+  s: ["sA","sF","sC","sO"],     l: ["l1y","l1n","l2y","l2n"]
+};
+const SRC = [];
+const ln = (t, ids, br) => SRC.push({ t, ids, br });
+ln("3000-DETAIL.", null);
+ln("    * VALIDATE-FIELDS (BR-01 .. BR-04)", G.v);
+ln("    IF ACCT-NO IS NUMERIC", ["v1y","v1n"]);
+ln("        CONTINUE", ["v1y"], "BR-01");
+ln("    ELSE", ["v1n"]);
+ln("        MOVE 'E01' TO ERR-CODE", ["v1n"], "BR-02");
+ln("        PERFORM 9100-REJECT-RECORD", ["v1n"]);
+ln("        GO TO 3000-DETAIL-EXIT", ["v1n"]);
+ln("    END-IF", ["v1y"]);
+ln("    IF TXN-DATE-VALID", ["v2y","v2n"]);
+ln("        CONTINUE", ["v2y"], "BR-03");
+ln("    ELSE", ["v2n"]);
+ln("        MOVE 'E02' TO ERR-CODE", ["v2n"], "BR-04");
+ln("        PERFORM 9100-REJECT-RECORD", ["v2n"]);
+ln("        GO TO 3000-DETAIL-EXIT", ["v2n"]);
+ln("    END-IF", ["v2y"]);
+ln("    * AMOUNT-RULES (BR-05 .. BR-08)", G.a);
+ln("    IF TXN-AMT > 0", ["a1y","a1n"]);
+ln("        CONTINUE", ["a1y"], "BR-05");
+ln("    ELSE", ["a1n"]);
+ln("        MOVE 'E03' TO ERR-CODE", ["a1n"], "BR-06");
+ln("        PERFORM 9100-REJECT-RECORD", ["a1n"]);
+ln("        GO TO 3000-DETAIL-EXIT", ["a1n"]);
+ln("    END-IF", ["a1y"]);
+ln("    IF TXN-AMT > 10000", ["a2y","a2n"]);
+ln("        MOVE 'Y' TO AML-REVIEW-FLAG", ["a2y"], "BR-07");
+ln("    ELSE", ["a2n"]);
+ln("        MOVE 'N' TO AML-REVIEW-FLAG", ["a2n"], "BR-08");
+ln("    END-IF", ["a2y","a2n"]);
+ln("    * STATUS-CHECK (BR-09 .. BR-12)", G.s);
+ln("    EVALUATE ACCT-STATUS", G.s);
+ln("        WHEN 'A'", G.s);
+ln("            CONTINUE", ["sA"], "BR-09");
+ln("        WHEN 'F'", ["sF","sC","sO"]);
+ln("            MOVE 'E05' TO ERR-CODE", ["sF"], "BR-10");
+ln("            PERFORM 9100-REJECT-RECORD", ["sF"]);
+ln("            GO TO 3000-DETAIL-EXIT", ["sF"]);
+ln("        WHEN 'C'", ["sC","sO"]);
+ln("            MOVE 'E06' TO ERR-CODE", ["sC"], "BR-11");
+ln("            PERFORM 9100-REJECT-RECORD", ["sC"]);
+ln("            GO TO 3000-DETAIL-EXIT", ["sC"]);
+ln("        WHEN OTHER", ["sO"]);
+ln("            MOVE 'E07' TO ERR-CODE", ["sO"], "BR-12");
+ln("            PERFORM 9100-REJECT-RECORD", ["sO"]);
+ln("            GO TO 3000-DETAIL-EXIT", ["sO"]);
+ln("    END-EVALUATE", ["sA"]);
+ln("    * LIMIT-CHECK (BR-13 .. BR-16)", G.l);
+ln("    IF TXN-AMT > DAILY-LMT", ["l1y","l1n"]);
+ln("        MOVE 'E04' TO ERR-CODE", ["l1y"], "BR-13");
+ln("        PERFORM 9100-REJECT-RECORD", ["l1y"]);
+ln("        GO TO 3000-DETAIL-EXIT", ["l1y"]);
+ln("    ELSE", ["l1n"]);
+ln("        CONTINUE", ["l1n"], "BR-14");
+ln("    END-IF", ["l1n"]);
+ln("    IF TXN-TYPE = 'W'", ["l2y","l2n"]);
+ln("        ADD 2.50 TO TXN-FEE", ["l2y"], "BR-15");
+ln("    ELSE", ["l2n"]);
+ln("        CONTINUE", ["l2n"], "BR-16");
+ln("    END-IF", ["l2y","l2n"]);
+ln("    PERFORM 3900-POST-DETAIL", ["l2y","l2n"]);
+ln("3000-DETAIL-EXIT.", null);
+ln("    EXIT.", null);
+
+const codeDiv = document.getElementById("code");
+SRC.forEach((s, i) => {
+  s.cmt = /^\s*\*/.test(s.t);
+  s.nTests = s.ids ? tests.filter(t => s.ids.some(id => t.leaves.includes(id))).length : tests.length;
+  const d = document.createElement("div");
+  d.innerHTML = `<span class="no">${String(i + 1).padStart(3, "0")}</span><span class="st"><i></i></span><span class="tx"></span><span class="meta"></span>`;
+  d.querySelector(".tx").textContent = s.t;
+  codeDiv.appendChild(d);
+  s.el = d;
+});
+document.getElementById("codeLg").innerHTML =
+  `<span class="lg"><i style="background:#16a34a"></i>covered by a test<i style="background:#e11d48"></i>never executed by any test</span>`;
+
+function paintCode(sel, color) {
+  const on = new Set(sel);
+  let step = 0, first = null;
+  SRC.forEach(s => {
+    const d = s.el, i = d.querySelector(".st i"), meta = d.querySelector(".meta");
+    d.className = "cl" + (s.cmt ? " cmt" : "");
+    d.style.background = ""; d.style.borderLeftColor = ""; i.textContent = ""; i.style.background = "";
+    meta.innerHTML = s.br ? `<span>${s.br}</span>` : "";
+    if (sel.length) {
+      const hit = !s.ids || s.ids.some(id => on.has(id));
+      if (hit) {
+        d.classList.add("sel");
+        d.style.background = color + "26"; d.style.borderLeftColor = color;
+        if (!s.cmt) { i.textContent = ++step; i.style.background = color; }
+        if (!first) first = d;
+      } else d.classList.add("skip");
+    } else {
+      const cv = !s.ids || s.ids.some(id => coveredLeaf.has(id));
+      d.classList.add(cv ? "c-ok" : "c-gap");
+      if (!s.cmt) meta.innerHTML += `<span>${s.nTests} test${s.nTests === 1 ? "" : "s"}</span>`;
+      if (!cv) meta.innerHTML += `<span style="background:#e11d48;color:#fff">NOT COVERED</span>`;
+    }
+  });
+  codeDiv.scrollTop = first ? Math.max(0, first.offsetTop - 6) : 0;
+}
+
+let curB = null;
+function selectB(key) {
+  const test = tests.find(t => t.k === key), gap = paths.find(p => p.k === key);
+  const sel = test ? test.leaves : gap ? gap.ids : [];
+  const color = test ? test.color : "#e11d48";
+  curB = test || gap ? key : null;
+  const on = new Set(sel.map(i => idxB[i]));
+  svgB.classList.toggle("dim", on.size > 0);
+
+  TB.strands.forEach((segs, i) => segs.forEach(s => {
+    const hl = on.has(i), cv = coveredLeaf.has(TB.leaves[i].id);
+    s.base.classList.toggle("on", hl);
+    s.flow.classList.toggle("on", hl);
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${color})` : "";
+    if (on.size) { s.base.style.stroke = hl ? color : ""; s.base.style.strokeWidth = ""; s.base.style.strokeDasharray = ""; }
+    else { s.base.style.stroke = cv ? "#16a34a" : "#e11d48"; s.base.style.strokeWidth = "2.5"; s.base.style.strokeDasharray = cv ? "" : "5 4"; }
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  // node colours + execution order (first visit)
+  const nodeColor = new Map(), nodeNo = new Map();
+  let n = 0;
+  sel.forEach(id => TB.leaves[idxB[id]].path.forEach(nd => { if (!nodeNo.has(nd)) nodeNo.set(nd, ++n); nodeColor.set(nd, color); }));
+  TB.nodeEls.forEach((e, nd) => {
+    const c = nodeColor.get(nd);
+    e.g.classList.toggle("on", !!c);
+    e.rect.style.fill = c || ""; e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || ""; e.num.style.fill = c || "";
+    e.num.textContent = nodeNo.get(nd) || "";
+    e.g.classList.remove("cov-ok", "cov-gap", "cov-part");
+    if (!on.size) e.g.classList.add(covClass(nd));
+  });
+
+  paintCode(sel, color);
+  Object.entries(chipElsB).forEach(([k, b]) => b.classList.toggle("active", k === (curB || "__cov__")));
+  document.querySelectorAll("#gaps [data-k]").forEach(d => d.classList.toggle("active", d.dataset.k === curB));
+
+  if (test) {
+    infoB.style.borderLeftColor = color; infoB.style.background = color + "1f";
+    infoB.innerHTML = `<b style="color:${color}">${test.k} &ndash; ${test.n}</b><span class="tag" style="background:${test.res.startsWith("Rejected") ? "#e11d48" : "#16a34a"}">${test.res}</span>` +
+      `<div>path: ${pathText(test.leaves)}</div><div>rules: ${test.leaves.map(i => D[i].br).join(", ")}</div><div>input: ${test.inp}</div>`;
+  } else if (gap) {
+    infoB.style.borderLeftColor = "#e11d48"; infoB.style.background = "#e11d481f";
+    infoB.innerHTML = `<b style="color:#e11d48">${gap.k} &ndash; uncovered path</b><span class="tag" style="background:#e11d48">NO TEST</span>` +
+      `<div>path: ${pathText(gap.ids)}</div><div>rules: ${gap.ids.map(i => D[i].br).join(", ")}</div><div>No test exercises this combination &ndash; add a test case for it.</div>`;
+  } else {
+    infoB.style.borderLeftColor = "#374151"; infoB.style.background = "#eef0f3";
+    infoB.innerHTML = `<b>Coverage view</b> green = outcome covered by a test &middot; red dashed = never exercised &middot; amber = partly covered. ` +
+      `Pick a test above, or an uncovered path on the right.`;
+  }
+}
+selectB(null);
+
+/* ---------- view switching ---------- */
+function showView(v) {
+  document.getElementById("viewA").hidden = v !== "A";
+  document.getElementById("viewB").hidden = v !== "B";
+  document.getElementById("title").textContent = v === "B" ? "Detail record – business rules & path coverage" : "COBOL program – functionality path highlighter";
+  document.getElementById("subtitle").innerHTML = v === "B"
+    ? "Drill-down of <b>PERFORM DETAIL</b>. Illustrative rules and tests: each leaf is one business-rule outcome; each test exercises one end-to-end path."
+    : "Click a functionality to light up the path through paragraph &rarr; condition &rarr; branch. Numbered badges show the order of execution. You can also click a bottom-level box.";
+}
+document.getElementById("back").addEventListener("click", () => showView("A"));
+</script>
+</body>
+</html>

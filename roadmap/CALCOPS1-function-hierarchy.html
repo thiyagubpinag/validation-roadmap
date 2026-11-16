@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CALCOPS1 – Function → SubFunction → Business Rule → Step</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 28px 40px; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-size:14px; line-height:1.5; background:#f7f8fa; color:#1f2328; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  p.sub { margin:0 0 18px; color:#57606a; max-width:860px; }
+  h2 { font-size:15px; margin:30px 0 10px; }
+
+  /* legend */
+  .legend { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .lg { flex:1 1 200px; background:#fff; border:1px solid #e5e7eb; border-left:6px solid var(--c); border-radius:6px; padding:10px 14px; }
+  .lg b { color:var(--c); display:block; font-size:13px; text-transform:uppercase; letter-spacing:.04em; }
+  .lg span { color:#57606a; font-size:13px; }
+  .F { --c:#2563eb; } .S { --c:#7c5cd8; } .R { --c:#0f766e; } .T { --c:#b45309; } .O { --c:#9f1239; }
+
+  /* tree */
+  .scroll { overflow-x:auto; padding-bottom:6px; }
+  .heads, .tree { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,.95fr) minmax(0,1.1fr) minmax(0,1.5fr); column-gap:clamp(18px,3vw,40px); width:100%; }
+  .heads div { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#57606a; padding:0 4px 6px; }
+  .tree { position:relative; row-gap:6px; }
+  svg.links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  svg.links path { fill:none; stroke:#c9ced6; stroke-width:1.5; transition:stroke .15s, stroke-width .15s, opacity .15s; }
+  svg.links path.on { stroke:var(--c,#374151); stroke-width:3; }
+  .tree.dim svg.links path:not(.on) { opacity:.2; }
+
+  .card { position:relative; background:#fff; border:1.5px solid var(--c); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; justify-content:center; transition:opacity .15s, box-shadow .15s; cursor:default; }
+  .card .id { font:700 11px ui-monospace,Menlo,Consolas,monospace; color:var(--c); }
+  .card .t { font-weight:700; font-size:13.5px; }
+  .card .m { font-size:12px; color:#57606a; margin-top:1px; }
+  .F.card { background:#eff5ff; border-width:2px; }
+  .S.card { background:#f5f2ff; }
+  .T.card { background:#fffaf2; border-width:1px; padding:6px 10px; }
+  .T.card .t { font-size:12.5px; }
+  .T.card .m code { font:11px ui-monospace,Menlo,Consolas,monospace; color:#374151; }
+  .tree.dim .card:not(.on) { opacity:.28; }
+  .card.on { box-shadow:0 2px 10px rgba(0,0,0,.16); }
+  .chip { display:inline-block; font:700 10.5px ui-monospace,Menlo,Consolas,monospace; padding:1px 7px; border-radius:9px; margin:3px 4px 0 0; background:#e6f4f1; color:#0f766e; }
+  .chip.err { background:#ffe4e6; color:#9f1239; }
+  .chip.ok  { background:#dcfce7; color:#166534; }
+  .num { display:inline-block; min-width:18px; text-align:center; font:700 10.5px -apple-system,"Segoe UI",sans-serif; color:#fff; background:var(--c); border-radius:9px; padding:0 5px; margin-right:6px; }
+
+  /* worked example */
+  .chain { display:flex; flex-wrap:wrap; align-items:stretch; }
+  .chain .st { flex:1 1 150px; background:#fff; border:1.5px solid var(--c); border-radius:8px; padding:9px 12px; position:relative; margin-right:26px; margin-bottom:10px; }
+  .chain .st:last-child { margin-right:0; }
+  .chain .st::after { content:"\2192"; position:absolute; right:-22px; top:50%; transform:translateY(-50%); font-size:18px; color:#57606a; }
+  .chain .st:last-child::after { content:""; }
+  .chain .st small { display:block; font:700 10.5px -apple-system,"Segoe UI",sans-serif; letter-spacing:.05em; text-transform:uppercase; color:var(--c); }
+  .chain .st code, td code { font:12px ui-monospace,Menlo,Consolas,monospace; color:#374151; }
+  .note { margin-top:6px; padding:10px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; color:#57606a; font-size:13px; }
+
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e5e7eb; font-size:13px; }
+  th { text-align:left; background:#eef0f3; font-size:11.5px; padding:6px 10px; color:#374151; }
+  td { padding:6px 10px; border-top:1px solid #f0f1f3; vertical-align:top; }
+  td.c { font:700 12px ui-monospace,Menlo,Consolas,monospace; white-space:nowrap; }
+
+  footer { margin-top:36px; padding-top:10px; border-top:1px solid #e5e7eb; text-align:center; font-size:12px; color:#8b929b; }
+</style>
+</head>
+<body>
+
+<h1>CALCOPS1: Function → SubFunction → Business Rule → Step</h1>
+<p class="sub">Each step belongs to one business rule, each rule to one SubFunction and each SubFunction to one Function. A step is the smallest unit: one <i>condition → action → outcome</i>. Hover over any box to trace its path up and down the hierarchy.</p>
+
+<div class="legend">
+  <div class="lg F"><b>Function</b><span>A major capability: <i>what the program does</i> for the business.</span></div>
+  <div class="lg S"><b>SubFunction</b><span>A group of related rules: one theme of that capability.</span></div>
+  <div class="lg R"><b>Business Rule</b><span>A named policy made up of ordered steps.</span></div>
+  <div class="lg T"><b>Step</b><span>One check: a condition, the action taken and the outcome (often a status code).</span></div>
+</div>
+
+<div class="scroll">
+  <div class="heads"><div>Function</div><div>SubFunction</div><div>Business Rule</div><div>Step</div></div>
+  <div class="tree" id="tree"><svg class="links" id="links"></svg></div>
+</div>
+
+<h2>Worked example: "divide 10 by 0"</h2>
+<div class="chain">
+  <div class="st F"><small>Function</small>2 Controlled Arithmetic Processing</div>
+  <div class="st S"><small>SubFunction</small>2.3 Arithmetic Calculation Policies</div>
+  <div class="st R"><small>Business Rule</small>2.3.4 Division Policy</div>
+  <div class="st T"><small>Step 2</small>Reject zero divisor<br><code>WS-OPERAND-B = 0</code></div>
+  <div class="st O"><small>Outcome</small>Status <code>'20'</code>. Division is not attempted.</div>
+</div>
+<div class="note">Reading top-down, the function is controlled arithmetic, the theme is calculation policies, the policy is division and the step is "reject zero divisor". Reading bottom-up, the status '20' came from step 2 of the Division Policy rule.</div>
+
+<h2>Anatomy of one business rule</h2>
+<table>
+  <tr><th>Part</th><th>Meaning</th><th>Example (2.3.4 Division Policy)</th></tr>
+  <tr><td class="c">Purpose</td><td>Why the rule exists, in business words</td><td>Divide safely; reject zero or too-small divisors</td></tr>
+  <tr><td class="c">Rule steps</td><td>Ordered checks, each with Condition → Action → Outcome</td><td>Condition: <code>WS-OPERAND-B = 0</code> → Action: set status '20' → Outcome: no division</td></tr>
+  <tr><td class="c">Relevant paragraphs</td><td>The COBOL code that implements it</td><td>3300-DIVIDE-PARA, 0000-MAIN-PARA</td></tr>
+  <tr><td class="c">Business significance</td><td>What goes wrong if the rule is broken</td><td>Zero or near-zero divisors cause failures or inaccurate quotients</td></tr>
+</table>
+
+<footer>Source: docs/business-rule/cobol/CALCOPS1-overview.md · Made with IBM Bob</footer>
+
+<script>
+(function () {
+  // [id, title, meta, rules:[ [id, title, steps:[ [title, condition, [[status,kind]...]] ]] ]]
+  var RANGE = ["Apply operand range validation", "operand outside WS-MIN / WS-MAX", [["40 out of range", "err"]]];
+  var DATA = [
+    ["2", "Controlled Arithmetic Processing", [
+      ["2.1", "Operation Selection and Validation", [
+        ["2.1.1", "Supported Operation Recognition", [
+          ["Match operation code to a supported calculation", "WS-OP-CODE is add, subtract, multiply or divide", []],
+          ["Reject unsupported operation codes", "WS-OP-CODE matches no supported operation", [["30 invalid operation", "err"]]]
+        ]]
+      ]],
+      ["2.2", "Operand Range Control", [
+        ["2.2.1", "Operand Limit Enforcement", [
+          ["Check operands A and B against permitted limits", "operand above WS-MAX or below WS-MIN", [["40 out of range", "err"]]]
+        ]]
+      ]],
+      ["2.3", "Arithmetic Calculation Policies", [
+        ["2.3.1", "Addition Policy", [
+          RANGE,
+          ["Zero shortcut", "A and B are both zero", [["00 success", "ok"]]],
+          ["Add and check for overflow", "operands valid, not both zero", [["00 success", "ok"], ["10 overflow", "err"]]]
+        ]],
+        ["2.3.2", "Subtraction Policy with Negative Result Control", [
+          RANGE,
+          ["Equal operand shortcut", "A equals B", [["00 success", "ok"]]],
+          ["Subtract and check for overflow", "operands valid and unequal", [["10 overflow", "err"]]],
+          ["Enforce negative result policy", "result negative and negatives not allowed", [["50 negative result", "err"]]]
+        ]],
+        ["2.3.3", "Multiplication Policy with Precision Loss Detection", [
+          RANGE,
+          ["Zero operand shortcut", "A or B is zero", [["00 success", "ok"]]],
+          ["Multiply with rounding and check overflow", "operands valid and non-zero", [["10 overflow", "err"]]],
+          ["Detect precision loss", "result is zero but both operands are non-zero", [["60 precision loss", "err"]]]
+        ]],
+        ["2.3.4", "Division Policy with Zero Divisor and Precision Floor Controls", [
+          RANGE,
+          ["Reject zero divisor", "WS-OPERAND-B = 0", [["20 divide by zero", "err"]]],
+          ["Reject divisor below precision floor", "|B| below WS-PRECISION-FLOOR", [["60 precision loss", "err"]]],
+          ["Zero dividend shortcut", "WS-OPERAND-A = 0", [["00 success", "ok"]]],
+          ["Divide with rounding, capture remainder, check overflow", "operands valid, divisor acceptable, dividend non-zero", [["00 success", "ok"], ["10 overflow", "err"]]]
+        ]]
+      ]]
+    ]],
+    ["3", "Arithmetic Behavior Verification", [
+      ["3.1", "Expected-Outcome Scenario Testing", [
+        ["3.1.1", "Scenario-Based Validation of Expected Status Outcomes", [
+          ["Define scenarios with expected statuses", "each scenario has op code, operands, expected status", []],
+          ["Addition expectations", "addition scenarios", [["00 success", "ok"], ["40 out of range", "err"]]],
+          ["Subtraction expectations", "subtraction scenarios", [["50 negative result", "err"]]],
+          ["Multiplication expectations", "multiplication scenarios", [["10 overflow", "err"], ["60 precision loss", "err"]]],
+          ["Division and invalid operation expectations", "division and unknown-code scenarios", [["20 divide by zero", "err"], ["60 precision loss", "err"], ["30 invalid operation", "err"]]]
+        ]]
+      ]]
+    ]]
+  ];
+
+  var tree = document.getElementById("tree"), svg = document.getElementById("links");
+  var cards = [], byId = {}, kids = {};
+
+  function card(cls, col, row, span, id, parent, html) {
+    var d = document.createElement("div");
+    d.className = "card " + cls;
+    d.style.gridColumn = col;
+    d.style.gridRow = row + " / span " + span;
+    d.dataset.id = id;
+    if (parent) { d.dataset.parent = parent; (kids[parent] = kids[parent] || []).push(id); }
+    d.innerHTML = html;
+    tree.appendChild(d); cards.push(d); byId[id] = d;
+  }
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function chips(arr) { return arr.map(function (c) { return '<span class="chip ' + c[1] + '">' + c[0] + '</span>'; }).join(""); }
+
+  var row = 1;
+  DATA.forEach(function (f) {
+    var fRow = row, fRules = 0, fSteps = 0;
+    f[2].forEach(function (s) {
+      var sRow = row, sSteps = 0, sRules = s[2].length;
+      s[2].forEach(function (r) {
+        var rRow = row, n = r[2].length;
+        r[2].forEach(function (st, i) {
+          var id = "T" + r[0] + "." + (i + 1);
+          card("T", 4, row, 1, id, "R" + r[0],
+            '<span class="t"><span class="num">' + (i + 1) + '</span>' + esc(st[0]) + '</span>' +
+            '<span class="m">If <code>' + esc(st[1]) + '</code></span>' +
+            (st[2].length ? '<div>' + chips(st[2]) + '</div>' : ''));
+          row++;
+        });
+        card("R", 3, rRow, n, "R" + r[0], "S" + s[0],
+          '<span class="id">' + r[0] + '</span><span class="t">' + esc(r[1]) + '</span><span class="m">' + n + ' step' + (n > 1 ? 's' : '') + '</span>');
+        sSteps += n;
+      });
+      card("S", 2, sRow, sSteps, "S" + s[0], "F" + f[0],
+        '<span class="id">' + s[0] + '</span><span class="t">' + esc(s[1]) + '</span><span class="m">' + sRules + ' rule' + (sRules > 1 ? 's' : '') + ' · ' + sSteps + ' step' + (sSteps > 1 ? 's' : '') + '</span>');
+      fRules += sRules; fSteps += sSteps;
+    });
+    card("F", 1, fRow, fSteps, "F" + f[0], null,
+      '<span class="id">' + f[0] + '</span><span class="t">' + esc(f[1]) + '</span><span class="m">' + f[2].length + ' SubFunction' + (f[2].length > 1 ? 's' : '') + ' · ' + fRules + ' rule' + (fRules > 1 ? 's' : '') + ' · ' + fSteps + ' steps</span>');
+  });
+
+  var paths = {};
+  function colorOf(c) { return getComputedStyle(c).getPropertyValue("--c"); }
+  function draw() {
+    svg.innerHTML = ""; paths = {};
+    var t = tree.getBoundingClientRect();
+    cards.forEach(function (c) {
+      var pid = c.dataset.parent; if (!pid) return;
+      var a = byId[pid].getBoundingClientRect(), b = c.getBoundingClientRect();
+      var x1 = a.right - t.left, y1 = a.top + a.height / 2 - t.top;
+      var x2 = b.left - t.left,  y2 = b.top + b.height / 2 - t.top;
+      var mx = (x1 + x2) / 2;
+      var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2);
+      p.style.setProperty("--c", colorOf(c));
+      svg.appendChild(p); paths[c.dataset.id] = p;
+    });
+  }
+
+  function lineage(id) {
+    var set = {}, up = id;
+    while (up) { set[up] = 1; up = byId[up].dataset.parent; }
+    (function down(i) { set[i] = 1; (kids[i] || []).forEach(down); })(id);
+    return set;
+  }
+
+  cards.forEach(function (c) {
+    c.addEventListener("mouseenter", function () {
+      var s = lineage(c.dataset.id);
+      tree.classList.add("dim");
+      cards.forEach(function (x) { x.classList.toggle("on", !!s[x.dataset.id]); });
+      Object.keys(paths).forEach(function (k) { paths[k].classList.toggle("on", !!s[k]); });
+    });
+    c.addEventListener("mouseleave", function () {
+      tree.classList.remove("dim");
+      cards.forEach(function (x) { x.classList.remove("on"); });
+      Object.keys(paths).forEach(function (k) { paths[k].classList.remove("on"); });
+    });
+  });
+
+  draw();
+  window.addEventListener("resize", draw);
+  window.addEventListener("load", draw);
+})();
+</script>
+</body>
+</html>

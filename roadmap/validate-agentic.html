@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>COBOL Functionality Path Highlighter</title>
+<style>
+  html, body { height:100%; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:#f7f8fa; color:#1f2328; display:flex; flex-direction:column; overflow:hidden; }
+  h1 { font-size:17px; margin:10px 16px 2px; }
+  p.sub { margin:0 16px 8px; color:#57606a; font-size:12px; }
+  #chips { flex:none; display:flex; flex-wrap:wrap; gap:7px; margin:0 16px 8px; }
+  #chips button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 12px; border:2px solid var(--c, #c9ced6); border-radius:16px; background:#fff; color:var(--c, #1f2328); cursor:pointer; transition:all .15s; }
+  #chips button:hover { background:var(--c); color:#fff; transform:translateY(-1px); }
+  #chips button.active { background:var(--c); color:#fff; box-shadow:0 3px 10px var(--c); }
+  #chips button.all { --c:#374151; }
+  #info { flex:none; margin:0 16px 4px; padding:7px 12px; font-size:12.5px; border-left:5px solid #c9ced6; background:#eef0f3; border-radius:4px; font-family:ui-monospace,Menlo,Consolas,monospace; color:#374151; transition:all .2s; }
+  #info b { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-size:13px; margin-right:6px; }
+  #info div { margin-top:2px; }
+  #wrap { flex:1 1 auto; min-height:0; padding:0 8px 8px; }
+  #svg { width:100%; height:100%; display:block; }
+
+  .strand { fill:none; stroke-linecap:round; stroke:#cfd4db; stroke-width:1.5; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .dim .strand:not(.on) { opacity:.35; }
+  .strand.on { stroke-width:6; }
+  .flow { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-dasharray:1 13; opacity:0; pointer-events:none; }
+  .flow.on { opacity:.9; animation:flow 0.9s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-14; } }
+
+  .lvl { font-size:9px; fill:#57606a; font-weight:600; }
+  .node rect { fill:#fff; stroke:#cfd4db; stroke-width:1.5; transition:fill .25s, stroke .25s; }
+  .node text { fill:#9aa1ab; transition:fill .25s; }
+  .node .l1 { font-size:8.5px; font-weight:700; letter-spacing:.02em; }
+  .node .l2 { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:9.5px; }
+  .node.leaf { cursor:pointer; }
+  .node.leaf:hover rect { stroke:#6b7280; }
+  .dim .node:not(.on) { opacity:.45; }
+  .node.on rect { stroke-width:2.5; }
+  .node.on text { fill:#fff; }
+  .node.on .l1 { opacity:.85; }
+  .badge circle { fill:#fff; stroke-width:2; }
+  .badge text { font-size:8px; font-weight:800; text-anchor:middle; }
+  .badge { display:none; }
+  .node.on .badge { display:block; }
+</style>
+</head>
+<body>
+<h1>COBOL program – functionality path highlighter</h1>
+<p class="sub">Click a functionality to light up the path through paragraph &rarr; condition &rarr; branch. Numbered badges show the order of execution. You can also click a bottom-level box.</p>
+<div id="chips"></div>
+<div id="info"></div>
+<div id="wrap"><svg id="svg" preserveAspectRatio="xMidYMin meet"></svg></div>
+
+<script>
+// p = first line (paragraph name or construct type), c = second line (condition / action)
+// f = functionality implemented by this leaf (only on leaves)
+const data = {
+  p: "PARAGRAPH", c: "0000-MAINLINE",
+  children: [
+    { p: "1000-INIT", c: "IF OPEN-OK", children: [
+      { p: "IF", c: "INPUT-FS = '00'", children: [
+        { p: "THEN", c: "PERFORM READ",  f: "Read input" },
+        { p: "ELSE", c: "PERFORM ABEND", f: "Abend handling" } ] },
+      { p: "EVALUATE", c: "PARM-MODE", children: [
+        { p: "WHEN", c: "'B' BATCH-RUN", f: "Batch run" },
+        { p: "WHEN OTHER", c: "ONLINE-RUN", f: "Online run" } ] }
+    ]},
+    { p: "2000-PROCESS", c: "UNTIL EOF = 'Y'", children: [
+      { p: "IF", c: "REC-TYPE = 'D'", children: [
+        { p: "THEN", c: "PERFORM DETAIL", f: "Detail record" },
+        { p: "ELSE", c: "PERFORM HEADER", f: "Header record" } ] },
+      { p: "IF", c: "BALANCE < 0", children: [
+        { p: "THEN", c: "PERFORM NSF",  f: "Overdraft (NSF)" },
+        { p: "ELSE", c: "PERFORM POST", f: "Post transaction" } ] }
+    ]},
+    { p: "9000-TERMINATE", c: "IF RETURN-CODE = 0", children: [
+      { p: "IF", c: "REC-CNT > 0", children: [
+        { p: "THEN", c: "PERFORM SUMMARY", f: "Summary report" },
+        { p: "ELSE", c: "DISPLAY NO-DATA", f: "No-data message" } ] },
+      { p: "EVALUATE", c: "RETURN-CODE", children: [
+        { p: "WHEN", c: "0 CLOSE FILES", f: "Normal end" },
+        { p: "WHEN OTHER", c: "PERFORM ABEND", f: "Abend handling" } ] }
+    ]}
+  ]
+};
+
+const NS = "http://www.w3.org/2000/svg";
+const boxW = 104, boxH = 38, gapX = 6, levelH = 92, padX = 74, padTop = 14, padBot = 10;
+
+// layout: leaves get sequential x, parents centred over children
+const leaves = [];
+function layout(node, depth, parents) {
+  node.depth = depth;
+  node.y = padTop + depth * levelH;
+  if (!node.children) {
+    node.leafIdx = [leaves.length];
+    node.cx = padX + boxW / 2 + leaves.length * (boxW + gapX);
+    node.path = [...parents, node];
+    leaves.push(node);
+    return;
+  }
+  node.children.forEach(c => layout(c, depth + 1, [...parents, node]));
+  node.leafIdx = node.children.flatMap(c => c.leafIdx);
+  node.cx = (node.children[0].cx + node.children[node.children.length - 1].cx) / 2;
+}
+layout(data, 0, []);
+
+// functionalities -> leaf indexes (a functionality can span several paths)
+const funcs = {};
+leaves.forEach((l, i) => (funcs[l.f] = funcs[l.f] || []).push(i));
+const names = Object.keys(funcs);
+// vivid, well-separated colours
+const palette = ["#e11d48","#2563eb","#16a34a","#ea580c","#9333ea","#0891b2","#ca8a04","#db2777","#4f46e5","#0d9488"];
+const funcColor = {};
+names.forEach((n, i) => funcColor[n] = palette[i % palette.length]);
+
+const svg = document.getElementById("svg");
+const width = padX + leaves.length * (boxW + gapX) - gapX + 8;
+const height = padTop + 3 * levelH + boxH + padBot;
+svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+}
+
+[["Level 1", ""], ["Level 2", "paragraph"], ["Level 3", "condition"], ["Level 4", "branch"]].forEach(([a, b], d) => {
+  const y = padTop + d * levelH + boxH / 2;
+  el("text", { class: "lvl", x: 4, y: y - 1 }, svg).textContent = a;
+  el("text", { class: "lvl", x: 4, y: y + 10, "font-weight": 400 }, svg).textContent = b;
+});
+
+function slotX(node, leafIndex) {
+  const n = node.leafIdx.length, k = node.leafIdx.indexOf(leafIndex);
+  return node.cx - boxW / 2 + 8 + (boxW - 16) * (k + 0.5) / n;
+}
+
+const strandG = el("g", {});
+const nodeG = el("g", {});
+
+// strands: one base line + one animated "flow" overlay per path segment
+const strands = leaves.map((leaf, i) => {
+  const els = [];
+  for (let d = 0; d < leaf.path.length - 1; d++) {
+    const a = leaf.path[d], b = leaf.path[d + 1];
+    const x1 = slotX(a, i), y1 = a.y + boxH, x2 = slotX(b, i), y2 = b.y, my = (y1 + y2) / 2;
+    const dd = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+    els.push({ base: el("path", { class: "strand", d: dd }, strandG),
+               flow: el("path", { class: "flow", d: dd }, strandG) });
+  }
+  return els;
+});
+
+const nodeEls = new Map();
+function draw(node) {
+  const isLeaf = !node.children;
+  const g = el("g", { class: "node" + (isLeaf ? " leaf" : "") }, nodeG);
+  const rect = el("rect", { x: node.cx - boxW / 2, y: node.y, width: boxW, height: boxH, rx: 5 }, g);
+  el("text", { class: "l1", x: node.cx, y: node.y + 15, "text-anchor": "middle" }, g).textContent = node.p;
+  el("text", { class: "l2", x: node.cx, y: node.y + 29, "text-anchor": "middle" }, g).textContent = node.c;
+  // step badge (execution order: level number)
+  const bd = el("g", { class: "badge" }, g);
+  const circle = el("circle", { cx: node.cx - boxW / 2, cy: node.y, r: 7 }, bd);
+  const num = el("text", { x: node.cx - boxW / 2, y: node.y + 3 }, bd);
+  num.textContent = node.depth + 1;
+  nodeEls.set(node, { g, rect, circle, num });
+  if (isLeaf) g.addEventListener("click", () => select(node.f));
+  else node.children.forEach(draw);
+}
+draw(data);
+
+// chips
+const chipsDiv = document.getElementById("chips");
+const chipEls = {};
+function addChip(label, key, color, cls) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.setProperty("--c", color);
+  if (cls) b.className = cls;
+  b.addEventListener("click", () => select(chipEls[key].classList.contains("active") ? null : key));
+  chipsDiv.appendChild(b);
+  chipEls[key] = b;
+}
+names.forEach(n => addChip(n, n, funcColor[n]));
+addChip("Show all", "__all__", "#374151", "all");
+
+const info = document.getElementById("info");
+const pathHtml = leaf => leaf.path.slice(1).map(n => n.depth === 1 ? n.p : `${n.p} ${n.c}`).join(" → ");
+
+function select(name) {
+  const all = name === "__all__";
+  const on = new Set(all ? leaves.map((_, i) => i) : name ? funcs[name] : []);
+  const leafColor = i => all ? funcColor[leaves[i].f] : funcColor[name];
+
+  svg.classList.toggle("dim", on.size > 0);
+
+  strands.forEach((segs, i) => segs.forEach(s => {
+    const hl = on.has(i);
+    s.base.classList.toggle("on", hl);
+    s.flow.classList.toggle("on", hl);
+    s.base.style.stroke = hl ? leafColor(i) : "";
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${leafColor(i)})` : "";
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  // node -> colour (in "all" mode only leaves are coloured; shared nodes stay dark neutral)
+  const nodeColor = new Map();
+  on.forEach(i => leaves[i].path.forEach(n => {
+    if (!all) nodeColor.set(n, funcColor[name]);
+    else nodeColor.set(n, n.children ? "#374151" : funcColor[n.f]);
+  }));
+  nodeEls.forEach((e, n) => {
+    const c = nodeColor.get(n);
+    e.g.classList.toggle("on", !!c);
+    e.rect.style.fill = c || "";
+    e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || "";
+    e.num.style.fill = c || "";
+  });
+
+  Object.entries(chipEls).forEach(([k, b]) => b.classList.toggle("active", k === name));
+
+  if (name && !all) {
+    const c = funcColor[name];
+    info.style.borderLeftColor = c;
+    info.style.background = c + "1f";
+    info.innerHTML = `<b style="color:${c}">${name}</b>` +
+      [...on].map(i => `<div>${pathHtml(leaves[i])}</div>`).join("");
+  } else if (all) {
+    info.style.borderLeftColor = "#374151";
+    info.style.background = "#eef0f3";
+    info.innerHTML = "<b>All functionalities</b> – each path is drawn in its own colour";
+  } else {
+    info.style.borderLeftColor = "#c9ced6";
+    info.style.background = "#eef0f3";
+    info.innerHTML = "<b>No functionality selected</b> – pick one above";
+  }
+}
+select(null);
+</script>
+</body>
+</html>
