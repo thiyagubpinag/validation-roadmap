@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRECUST - functionality path and test-data coverage</title>
+<style>
+  html, body { min-height:100%; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:#f7f8fa; color:#1f2328; padding-bottom:16px; }
+  h1 { font-size:17px; margin:10px 16px 2px; }
+  p.sub { margin:0 16px 8px; color:#57606a; font-size:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:7px; margin:0 16px 8px; }
+  .chips button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 12px; border:2px solid var(--c, #c9ced6); border-radius:16px; background:#fff; color:var(--c, #1f2328); cursor:pointer; transition:all .15s; }
+  .chips button:hover { background:var(--c); color:#fff; transform:translateY(-1px); }
+  .chips button.active { background:var(--c); color:#fff; box-shadow:0 3px 10px var(--c); }
+  .chips button.all { --c:#374151; }
+  .info { margin:0 16px 6px; padding:7px 12px; font-size:12.5px; border-left:5px solid #c9ced6; background:#eef0f3; border-radius:4px; font-family:ui-monospace,Menlo,Consolas,monospace; color:#374151; transition:all .2s; }
+  .info b { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-size:13px; margin-right:6px; }
+  .info div { margin-top:2px; }
+  .info .tag { display:inline-block; font:700 10.5px -apple-system,"Segoe UI",sans-serif; padding:1px 7px; border-radius:9px; color:#fff; margin-right:6px; }
+  #kpi { display:flex; gap:10px; margin:0 16px 8px; flex-wrap:wrap; }
+  .card { background:#fff; border:1px solid #d8dce2; border-radius:6px; padding:6px 14px; min-width:130px; }
+  .card .v { font-size:20px; font-weight:800; }
+  .card .k { font-size:10.5px; color:#57606a; text-transform:uppercase; letter-spacing:.04em; }
+  .bar { height:5px; border-radius:3px; background:#e5e7eb; margin-top:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; }
+
+  #wrapT { overflow-x:auto; overflow-y:hidden; padding:0 8px 6px; }
+  #svgT { display:block; height:auto; }
+  .strand { fill:none; stroke-linecap:round; stroke:#cfd4db; stroke-width:1.5; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .dim .strand:not(.on):not(.gapS) { opacity:.35; }
+  .strand.on { stroke-width:6; }
+  .flow { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-dasharray:1 13; opacity:0; pointer-events:none; }
+  .flow.on { opacity:.9; animation:flow 0.9s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-14; } }
+  .lvl { font-size:9px; fill:#57606a; font-weight:600; }
+  .node rect { fill:#fff; stroke:#cfd4db; stroke-width:1.5; transition:fill .25s, stroke .25s; }
+  .node text { fill:#9aa1ab; transition:fill .25s; }
+  .node .l1 { font-size:8.5px; font-weight:700; letter-spacing:.02em; }
+  .node .l2 { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:9.5px; }
+  .node.leaf { cursor:pointer; }
+  .node.leaf:hover rect { stroke:#6b7280; }
+  .dim .node:not(.on):not(.ingap) { opacity:.45; }
+  .node.on rect { stroke-width:2.5; }
+  .node.on text { fill:#fff; }
+  .node.on .l1 { opacity:.85; }
+  .badge circle { fill:#fff; stroke-width:2; }
+  .badge text { font-size:8px; font-weight:800; text-anchor:middle; }
+  .badge { display:none; }
+  .node.on .badge { display:block; }
+  .node.cov-ok rect { fill:#dcfce7; stroke:#16a34a; }
+  .node.cov-gap rect { fill:#fff1f2; stroke:#e11d48; stroke-dasharray:4 3; }
+  .node.cov-part rect { fill:#fef3c7; stroke:#d97706; }
+  .node.cov-ok text, .node.cov-gap text, .node.cov-part text { fill:#1f2328; }
+
+  #codeSec { margin:0 16px 12px; background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:hidden; }
+  #codeSec h2, #panel h2 { margin:0; padding:6px 10px; font-size:11.5px; background:#eef0f3; border-bottom:1px solid #d8dce2; color:#374151; }
+  #codeSec h2 { display:flex; gap:14px; align-items:center; }
+  #codeSec h2 .lg { font-weight:400; font-size:10.5px; color:#57606a; }
+  #codeSec h2 .lg i { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 8px; vertical-align:-1px; }
+  #code { height:340px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; position:relative; }
+  .cl { display:flex; align-items:center; white-space:pre; border-left:4px solid transparent; padding:1px 0; color:#6b7280; transition:background .2s, color .2s; }
+  .cl .no { flex:none; width:42px; text-align:right; margin-right:8px; color:#c0c5cc; }
+  .cl .st { flex:none; width:26px; text-align:center; font:800 9px -apple-system,sans-serif; }
+  .cl .st i { display:none; font-style:normal; color:#fff; border-radius:8px; padding:1px 5px; }
+  .cl .tx { flex:1 1 auto; min-width:0; }
+  .cl .meta { flex:none; padding:0 10px; font:700 10px -apple-system,sans-serif; display:flex; gap:6px; }
+  .cl .meta span { border-radius:8px; padding:0 6px; background:#eef0f3; color:#57606a; }
+  .cl.cmt .tx { font-style:italic; color:#9aa1ab; }
+  .cl.sel { color:#111; font-weight:600; }
+  .cl.sel .st i { display:inline-block; }
+  .cl.sel.cmt { font-weight:400; }
+  .cl.skip { opacity:.38; }
+  .cl.c-ok { color:#374151; border-left-color:#16a34a; }
+  .cl.c-gap { color:#9f1239; background:#fff1f2; border-left-color:#e11d48; }
+  .cl.g-gap { color:#9f1239; background:#fff1f2; border-left-color:#e11d48; border-left-style:dashed; }
+  .cl.tp { outline:2px solid #111; outline-offset:-2px; background:#fde68a !important; color:#111; font-weight:700; }
+
+  #panel { display:grid; grid-template-columns:1.3fr 1.2fr 1fr; gap:12px; margin:0 16px 14px; height:380px; }
+  #panel section { background:#fff; border:1px solid #d8dce2; border-radius:6px; overflow:auto; }
+  #panel h2 { position:sticky; top:0; z-index:1; }
+  table.br { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.br th { text-align:left; font-size:10.5px; color:#57606a; padding:4px 8px; border-bottom:1px solid #e5e7eb; position:sticky; top:27px; background:#fff; }
+  table.br td { padding:4px 8px; border-bottom:1px solid #f0f1f3; vertical-align:top; }
+  table.br td.id { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; white-space:nowrap; }
+  table.br tr[data-leaf], table.br tr[data-f] { cursor:pointer; }
+  table.br tr[data-leaf]:hover, table.br tr[data-f]:hover { background:#f3f4f6; }
+  .pill { display:inline-block; font:700 10px ui-monospace,Menlo,Consolas,monospace; padding:1px 6px; border-radius:8px; margin:1px 2px 1px 0; }
+  .pill.ok { background:#dcfce7; color:#166534; }
+  .pill.imp { background:#fff; color:#166534; border:1px dashed #16a34a; }
+  .pill.gap { background:#ffe4e6; color:#9f1239; }
+  .gaps { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; }
+  .gaps div { padding:3px 10px; border-bottom:1px solid #f0f1f3; cursor:pointer; white-space:nowrap; }
+  .gaps div:hover { background:#fff1f2; }
+  .gaps div.active { background:#ffe4e6; font-weight:700; }
+  .tpbox { margin:8px; border:1px solid #d8dce2; border-radius:6px; cursor:pointer; }
+  .tpbox:hover { border-color:#6b7280; }
+  .tpbox.active { border-color:#111; box-shadow:0 0 0 2px #fde68a; }
+  .tpbox .h { padding:4px 8px; background:#f3f4f6; font:700 11px ui-monospace,Menlo,Consolas,monospace; display:flex; gap:8px; flex-wrap:wrap; }
+  .tpbox .h em { font-style:normal; font-weight:400; color:#57606a; }
+  .tpbox pre { margin:0; padding:4px 8px; font:11px ui-monospace,Menlo,Consolas,monospace; color:#374151; white-space:pre-wrap; }
+  table.kv { border-collapse:collapse; width:100%; font:10.5px ui-monospace,Menlo,Consolas,monospace; }
+  table.kv td { padding:1px 8px; vertical-align:top; word-break:break-all; }
+  table.kv td:first-child { color:#57606a; white-space:nowrap; width:1%; }
+  .sec { padding:2px 8px; font:700 10px -apple-system,sans-serif; color:#57606a; text-transform:uppercase; letter-spacing:.04em; background:#fafbfc; }
+  .note { padding:6px 10px; font-size:11.5px; color:#57606a; }
+</style>
+</head>
+<body>
+<h1>CRECUST &ndash; functionality path and test-data coverage</h1>
+<p class="sub">Pick a functionality: its test-data path lights up through section &rarr; condition &rarr; outcome, the matching COBOL lines are highlighted, and red dashed boxes show branches in that functionality that no test data reaches. Click any outcome box to see an end-to-end path through it.</p>
+
+<div class="chips" id="chips"></div>
+<div id="kpi"></div>
+<div class="info" id="info"></div>
+<div id="wrapT"><svg id="svgT"></svg></div>
+
+<div id="codeSec">
+  <h2>COBOL &ndash; CRECUST.cbl <span class="lg" id="codeLg"></span></h2>
+  <div id="code"></div>
+</div>
+
+<div id="panel">
+  <section><h2 id="tpTitle">Test data</h2><div id="tpBody"></div></section>
+  <section><h2 id="brTitle">Business-rule outcomes</h2><div id="brTable"></div></section>
+  <section><h2 id="gapTitle">End-to-end paths</h2><div class="gaps" id="gaps"></div></section>
+</div>
+
+<script>
+const SRC = ["       CBL CICS('SP,EDF')", "       CBL SQL", "      ******************************************************************", "      *                                                                *", "      *  Copyright IBM Corp. 2023                                      *", "      *                                                                *", "      ******************************************************************", "      ******************************************************************", "      * This program takes customer information from the BMS", "      * application (name, address and DOB) and should get the SORTCODE,", "      * determine which datastore to use (VSAM or DB2), then enqueue", "      * the counter for CUSTOMER, increment the counter and get", "      * that number.", "      *", "      * It then performs a credit check on multiple", "      * credit agencies (using Async API), waits for 3 seconds and", "      * aggregates and averages the returned credit scores.", "      *", "      * If no data is returned, from the credit checks, then", "      * set the credit score to 0 and mark the credit", "      * score review date as today (so another attempt at credit", "      * scoring will be carried out later).", "      *", "      * Next, attempt to update the CUSTOMER datastore & if that is", "      * successful, write a rec to the PROCTRAN datastore.", "      *", "      * If all of that works, then DEQUEUE the named counter", "      * and return the SORTCODE and CUSTOMER number.", "      *", "      * If for any reason the write to the CUSTOMER or PROCTRAN", "      * datatsore is unsuccessful, then we need to decrement the Named", "      * Counter (restoring it to the start position) and DEQUEUE the", "      * Named Counter.", "      *", "      ******************************************************************", "", "       IDENTIFICATION DIVISION.", "       PROGRAM-ID. CRECUST.", "       AUTHOR. Jon Collett.", "", "       ENVIRONMENT DIVISION.", "       CONFIGURATION SECTION.", "      * SOURCE-COMPUTER.  IBM-370 WITH DEBUGGING MODE.", "       SOURCE-COMPUTER.  IBM-370.", "       OBJECT-COMPUTER.  IBM-370.", "", "       INPUT-OUTPUT SECTION.", "", "       DATA DIVISION.", "       FILE SECTION.", "", "       WORKING-STORAGE SECTION.", "", "", "       COPY SORTCODE.", "", "", "", "       01 SYSIDERR-RETRY                PIC 999.", "", "      * CUSTOMER DB2 copybook", "           EXEC SQL", "             INCLUDE CUSTDB2", "             END-EXEC.", "", "      * CUSTOMER host variables for DB2", "       01 HOST-CUSTOMER-ROW.", "          03 HV-CUSTOMER-EYECATCHER     PIC X(4).", "          03 HV-CUSTOMER-SORTCODE       PIC X(6).", "          03 HV-CUSTOMER-NUMBER         PIC X(10).", "          03 HV-CUSTOMER-TITLE          PIC X(10).", "          03 HV-CUSTOMER-FIRST-NAME     PIC X(50).", "          03 HV-CUSTOMER-LAST-NAME      PIC X(50).", "          03 HV-CUSTOMER-DOB            PIC S9(9) COMP.", "          03 HV-CUSTOMER-PHONE          PIC X(20).", "          03 HV-CUSTOMER-ADDR-LINE1     PIC X(50).", "          03 HV-CUSTOMER-ADDR-LINE2     PIC X(50).", "          03 HV-CUSTOMER-CITY           PIC X(50).", "          03 HV-CUSTOMER-POSTCODE       PIC X(10).", "          03 HV-CUSTOMER-COUNTRY        PIC X(50).", "          03 HV-CUSTOMER-STATUS         PIC X(10).", "          03 HV-CUSTOMER-CREATE-DATE    PIC S9(9) COMP.", "          03 HV-CUSTOMER-CREDIT-SCORE   PIC S9(4) COMP.", "          03 HV-CUSTOMER-CS-REVIEW-DATE PIC S9(9) COMP.", "", "      * PROCTRAN DB2 copybook", "           EXEC SQL", "             INCLUDE PROCDB2", "             END-EXEC.", "", "      * PROCTRAN host variables for DB2", "       01 HOST-PROCTRAN-ROW.", "          03 HV-PROCTRAN-EYECATCHER     PIC X(4).", "          03 HV-PROCTRAN-SORT-CODE      PIC X(6).", "          03 HV-PROCTRAN-ACC-NUMBER     PIC X(8).", "          03 HV-PROCTRAN-DATE           PIC X(10).", "          03 HV-PROCTRAN-TIME           PIC X(6).", "          03 HV-PROCTRAN-REF            PIC X(12).", "          03 HV-PROCTRAN-TYPE           PIC X(3).", "          03 HV-PROCTRAN-DESC           PIC X(40).", "          03 HV-PROCTRAN-AMOUNT         PIC S9(10)V99 COMP-3.", "", "      * Get the CONTROL table", "           EXEC SQL", "              INCLUDE CONTDB2", "           END-EXEC.", "", "      * CONTROL Host variables for DB2", "       01 HOST-CONTROL-ROW.", "          03 HV-CONTROL-NAME            PIC X(32).", "          03 HV-CONTROL-VALUE-NUM       PIC S9(9) COMP.", "          03 HV-CONTROL-VALUE-STR       PIC X(32).", "", "      * Pull in the SQL COMMAREA", "           EXEC SQL", "          INCLUDE SQLCA", "           END-EXEC.", "", "       01 PROCTRAN-AREA.", "          COPY PROCTRAN.", "", "       01 PROCTRAN-RIDFLD               PIC S9(8) COMP.", "", "       01 WS-CICS-WORK-AREA.", "          05 WS-CICS-RESP               PIC S9(8) COMP.", "          05 WS-CICS-RESP2              PIC S9(8) COMP.", "", "       01 WS-CUSTOMER-NO-NUM            PIC 9(10).", "", "       01 WS-TIME-DATA.", "          03 WS-TIME-NOW                PIC 9(6).", "          03 WS-TIME-NOW-GRP REDEFINES WS-TIME-NOW.", "             05 WS-TIME-NOW-GRP-HH      PIC 99.", "             05 WS-TIME-NOW-GRP-MM      PIC 99.", "             05 WS-TIME-NOW-GRP-SS      PIC 99.", "", "       01 WS-ABEND-PGM                  PIC X(8)      VALUE 'ABNDPROC'.", "       01 ABNDINFO-REC.", "           COPY ABNDINFO.", "", "       LOCAL-STORAGE SECTION.", "       01 FILE-RETRY                    PIC 999.", "       01 WS-EXIT-RETRY-LOOP            PIC X         VALUE ' '.", "", "       01 OUTPUT-DATA.", "           COPY CUSTOMER.", "", "       01 RETURN-DATA.", "          03 RETURN-DATA-EYECATCHER     PIC X(4).", "          03 RETURN-DATA-NUMBER         PIC 9(10) DISPLAY.", "          03 RETURN-DATA-NAME           PIC X(60).", "          03 RETURN-DATA-ADDRESS        PIC X(160).", "          03 RETURN-DATA-DATE-OF-BIRTH  PIC 9(8).", "", "", "       01 CUSTOMER-KY.", "          03 REQUIRED-SORT-CODE         PIC 9(6)      VALUE 0.", "          03 REQUIRED-CUST-NUMBER       PIC 9(10)     VALUE 0.", "", "       01 RANDOM-CUSTOMER               PIC 9(10)     VALUE 0.", "       01 HIGHEST-CUST-NUMBER           PIC 9(10)     VALUE 0.", "", "       01 EXIT-VSAM-READ                PIC X         VALUE 'N'.", "       01 EXIT-DB2-READ                 PIC X         VALUE 'N'.", "", "       01 WS-V-RETRIED                  PIC X         VALUE 'N'.", "       01 WS-D-RETRIED                  PIC X         VALUE 'N'.", "", "       01 SQLCODE-DISPLAY               PIC S9(8) DISPLAY", "             SIGN LEADING SEPARATE.", "", "", "      *", "      * CUSTOMER NCS definitions", "      *", "       01 NCS-CUST-NO-STUFF.", "          03 NCS-CUST-NO-NAME.", "             05 NCS-CUST-NO-ACT-NAME    PIC X(9)", "                                                      VALUE 'BANKZCUST'.", "             05 NCS-CUST-NO-TEST-SORT   PIC X(6)", "                                                      VALUE '      '.", "             05 NCS-CUST-NO-FILL        PIC XX", "                                                      VALUE '  '.", "", "          03 NCS-CUST-NO-INC            PIC 9(16) COMP", "                                                      VALUE 0.", "          03 NCS-CUST-NO-VALUE          PIC 9(16) COMP", "                                                      VALUE 0.", "", "          03 NCS-CUST-NO-RESP           PIC XX        VALUE '00'.", "", "       01 WS-DISP-CUST-NO-VAL           PIC S9(18) DISPLAY.", "", "       01 WS-CUST-REC-LEN               PIC S9(4) COMP", "                                                      VALUE 0.", "", "       01 NCS-UPDATED                   PIC X         VALUE 'N'.", "", "       01 WS-U-TIME                     PIC S9(15) COMP-3.", "       01 WS-ORIG-DATE                  PIC X(10).", "       01 WS-ORIG-DATE-GRP REDEFINES WS-ORIG-DATE.", "          03 WS-ORIG-DATE-DD            PIC 99.", "          03 FILLER                     PIC X.", "          03 WS-ORIG-DATE-MM            PIC 99.", "          03 FILLER                     PIC X.", "          03 WS-ORIG-DATE-YYYY          PIC 9999.", "", "       01 WS-ORIG-DATE-GRP-X.", "          03 WS-ORIG-DATE-DD-X          PIC XX.", "          03 FILLER                     PIC X         VALUE '.'.", "          03 WS-ORIG-DATE-MM-X          PIC XX.", "          03 FILLER                     PIC X         VALUE '.'.", "          03 WS-ORIG-DATE-YYYY-X        PIC X(4).", "", "       01 STORED-SORTCODE               PIC X(6)      VALUE SPACES.", "       01 STORED-CUSTNO                 PIC X(10)     VALUE SPACES.", "       01 STORED-NAME                   PIC X(60)     VALUE SPACES.", "       01 STORED-DOB                    PIC X(10)     VALUE SPACES.", "", "       01 WS-EIBTASKN12                 PIC 9(12)     VALUE 0.", "       77 PROCTRAN-RETRY                PIC 999.", "", "       01 CUSTOMER-KY2.", "          03 REQUIRED-SORT-CODE2        PIC 9(6)      VALUE 0.", "          03 REQUIRED-CUST-NUMBER2      PIC 9(10)     VALUE 0.", "", "       01 CUSTOMER-KY2-BYTES REDEFINES CUSTOMER-KY2", "                                        PIC X(16).", "", "       01 HIGHEST-CUST-NUMBER           PIC 9(10)     VALUE 0.", "       01 WS-CC-CNT                     PIC 9         VALUE 0.", "       01 WS-FINISHED-FETCHING          PIC X         VALUE 'N'.", "       01 WS-RETRIEVED-CNT              PIC 9         VALUE 0.", "       01 WS-CHANNEL-NAME               PIC X(16)     VALUE SPACES.", "       01 WS-CREDIT-CHECK-ERROR         PIC X         VALUE 'N'.", "       01 WS-ACTUAL-CS-SCR              PIC 9(6)      VALUE 0.", "       01 WS-TOTAL-CS-SCR               PIC 9(6)      VALUE 0.", "", "       01 WS-CHILD-TOKENS.", "          03 WS-ANY-CHILD-TKN           PIC X(16).", "          03 WS-ANY-CHILD-FETCH-TKN     PIC X(16).", "", "       01 WS-ANY-CHILD-FETCH-CHAN       PIC X(16).", "       01 WS-ANY-CHILD-FETCH-ABCODE     PIC X(4)      VALUE SPACES.", "       01 WS-CHILD-ISSUED-CNT           PIC 9         VALUE 0.", "", "       01 WS-CHILD-ARRAY.", "          03 WS-CHILD-DETAILS OCCURS 9 TIMES.", "             05 WS-CHILD-CHAN           PIC X(16).", "             05 WS-CHILD-TKN            PIC X(16).", "", "       01 WS-CHILD-RECEIVED-CNT         PIC 9         VALUE 0.", "       01 WS-RECEIVE-CHILD-ARRAY.", "          03 WS-RECEIVE-CHILD-DTLS OCCURS 9 TIMES.", "             05 WS-RECEIVE-CHILD-CHAN   PIC X(16).", "", "       01 WS-CHILD-FETCH-COMPST         PIC S9(8) COMP.", "", "       01 WS-CHILD-DATA.", "          03 WS-CHILD-CUSTOMER-RECORD.", "             05 WS-CHILD-EYECATCHER        PIC X(4).", "             05 WS-CHILD-KEY.", "                07 WS-CHILD-SORTCODE       PIC 9(6) DISPLAY.", "                07 WS-CHILD-NUMBER         PIC 9(10) DISPLAY.", "             05 WS-CHILD-NAME.", "                07 WS-CHILD-TITLE          PIC X(10).", "                07 WS-CHILD-FIRST-NAME     PIC X(50).", "                07 WS-CHILD-LAST-NAME      PIC X(50).", "             05 WS-CHILD-DOB.", "                07 WS-CHILD-DOB-DAY        PIC 99 DISPLAY.", "                07 WS-CHILD-DOB-MONTH      PIC 99 DISPLAY.", "                07 WS-CHILD-DOB-YEAR       PIC 9999 DISPLAY.", "             05 WS-CHILD-PHONE             PIC X(20).", "             05 WS-CHILD-ADDRESS.", "                07 WS-CHILD-ADDR-LINE1     PIC X(50).", "                07 WS-CHILD-ADDR-LINE2     PIC X(50).", "                07 WS-CHILD-CITY           PIC X(50).", "                07 WS-CHILD-POSTCODE       PIC X(10).", "                07 WS-CHILD-COUNTRY        PIC X(50).", "             05 WS-CHILD-STATUS            PIC X(10).", "             05 WS-CHILD-CREATED-DATE.", "                07 WS-CHILD-CREATED-DAY    PIC 99 DISPLAY.", "                07 WS-CHILD-CREATED-MONTH  PIC 99 DISPLAY.", "                07 WS-CHILD-CREATED-YEAR   PIC 9999 DISPLAY.", "             05 WS-CHILD-CREDIT-SCORE      PIC 999.", "             05 WS-CHILD-CS-REVIEW-DATE.", "                07 WS-CHILD-CS-REVIEW-DAY  PIC 99 DISPLAY.", "                07 WS-CHILD-CS-REVIEW-MONTH PIC 99 DISPLAY.", "                07 WS-CHILD-CS-REVIEW-YEAR PIC 9999 DISPLAY.", "             05 WS-CHILD-SUCCESS           PIC X.", "             05 WS-CHILD-FAIL-CODE         PIC X.", "", "       01 WS-CONTAINER-NAME             PIC X(16)     VALUE SPACES.", "       01 WS-CHILD-CONTAINER-LEN        PIC S9(8) COMP", "                                                      VALUE 0.", "       01 WS-RUN-TRANSID                PIC X(4)      VALUE SPACES.", "", "       01 CICSTSLEVEL                   PIC X(6)      VALUE SPACES.", "", "       01 WS-CICSTS-LEVEL-DATA.", "          03 WS-CICSTSLEVEL             PIC X(6).", "          03 WS-CICSTS-LEVEL-NUM-GRP REDEFINES WS-CICSTSLEVEL.", "             05 WS-CICSTS-LEVEL-NUM-VV  PIC 99.", "             05 WS-CICSTS-LEVEL-NUM-RR  PIC 99.", "             05 WS-CICSTS-LEVEL-NUM-MM  PIC 99.", "", "       01 WS-CURRENT-DATE-DATA.", "          03 WS-CURRENT-DATE.", "             05 WS-CURRENT-YYYY         PIC 9(4).", "             05 WS-CURRENT-MM           PIC 99.", "             05 WS-CURRENT-DD           PIC 99.", "          03 WS-CURRENT-TIME.", "             05 WS-CURRENT-HOURS        PIC 99.", "             05 WS-CURRENT-MINS         PIC 99.", "             05 WS-CURRENT-SECS         PIC 99.", "             05 WS-CURRENT-MILLI        PIC 99.", "          03 WS-DIFFERENCE-FROM-GMT     PIC S9(4).", "", "       01 WS-CURRENT-DATE-9             PIC 9(8)      VALUE 0.", "       01 WS-TODAY-INT                  PIC 9(8)      VALUE 0.", "       01 WS-REVIEW-DATE-ADD            PIC 99        VALUE 0.", "       01 WS-NEW-REVIEW-DATE-INT        PIC 9(8)      VALUE 0.", "       01 WS-NEW-REVIEW-YYYYMMDD        PIC 9(8)      VALUE 0.", "       01 WS-PUT-CONT-NAME              PIC X(16)     VALUE SPACES.", "       01 WS-PUT-CONT-LEN               PIC S9(8) COMP", "                                                      VALUE 0.", "", "       01 WS-SEED                       PIC S9(15) COMP.", "", "       01 STORM-DRAIN-CONDITION         PIC X(20).", "", "       01 WS-DATE-OF-BIRTH-ERROR        PIC X         VALUE 'N'.", "       01 WS-DATE-OF-BIRTH-LILLIAN      PIC S9(9) BINARY.", "", "       01 DATE-OF-BIRTH-FORMAT.", "          03 DATE-OF-BIRTH-FORMAT-LENGTH", "                                        PIC S9(4) BINARY", "                                                      VALUE 10.", "          03 DATE-OF-BIRTH-FORMAT-TEXT  PIC X(8)      VALUE 'YYYYMMDD'.", "", "       01 DATE-OF-BIRTH-FOR-CEEDAYS.", "          03 DATE-OF-BIRTH-CEEDAYS-LENGTH", "                                        PIC S9(4) BINARY", "                                                      VALUE 10.", "          03 CEEDAYS-YEAR               PIC 9999.", "          03 CEEDAYS-MONTH              PIC 99.", "          03 CEEDAYS-DAY                PIC 99.", "", "       01 FC.", "          02 CONDITION-TOKEN-VALUE.", "           COPY  CEEIGZCT.", "             03 CASE-1-CONDITION-ID.", "                04 SEVERITY             PIC S9(4) BINARY.", "                04 MSG-NO               PIC S9(4) BINARY.", "             03 CASE-2-CONDITION-ID", "                   REDEFINES CASE-1-CONDITION-ID.", "                04 CLASS-CODE           PIC S9(4) BINARY.", "                04 CAUSE-CODE           PIC S9(4) BINARY.", "             03 CASE-SEV-CTL            PIC X.", "             03 FACILITY-ID             PIC XXX.", "          02 I-S-INFO                   PIC S9(9) BINARY.", "", "       01 WS-TODAY-LILLIAN              PIC S9(9) BINARY.", "       01 WS-TODAY-SECONDS COMP-2.", "       01 WS-TODAY-GREGORIAN.", "          03 WS-TODAY-G-YEAR            PIC 9(4).", "          03 WS-TODAY-G-MONTH           PIC 9(2).", "          03 WS-TODAY-G-DAY             PIC 9(2).", "          03 WS-TODAY-G-HOURS           PIC 9(2).", "          03 WS-TODAY-G-MINUTES         PIC 9(2).", "          03 WS-TODAY-G-SECONDS         PIC 9(2).", "          03 WS-TODAY-G-MILLISECONDS    PIC 999.", "", "       01 CHRDATE.", "          02 VSTRING-LENGTH             PIC S9(4) BINARY.", "          02 VSTRING-TEXT.", "             03 VSTRING-CHAR            PIC X", "                   OCCURS 0 TO 256 TIMES", "                   DEPENDING ON VSTRING-LENGTH", "                   OF CHRDATE.", "       01 PICSTR.", "          02 VSTRING-LENGTH             PIC S9(4) BINARY.", "          02 VSTRING-TEXT.", "             03 VSTRING-CHAR            PIC X", "                   OCCURS 0 TO 256 TIMES", "                   DEPENDING ON VSTRING-LENGTH", "                   OF PICSTR.", "       01 LILIAN                        PIC S9(9) BINARY.", "", "       01 WS-CUSTOMER-AGE               PIC S9999.", "", "       01 CUSTOMER-CONTROL.", "           COPY CUSTCTRL.", "", "       01 WS-UNSTR-TITLE                PIC X(9)      VALUE ' '.", "       01 WS-FULL-NAME                  PIC X(110)    VALUE SPACES.", "       01 WS-TITLE-VALID                PIC X.", "", "", "       LINKAGE SECTION.", "       01 DFHCOMMAREA.", "           COPY CRECUST.", "", "", "       PROCEDURE DIVISION USING DFHCOMMAREA.", "       PREMIERE SECTION.", "       P010.", "", "      *", "      *    You can change the customer's name, but the title must", "      *    be a valid one. Check that here", "      *", "           MOVE ' ' TO WS-TITLE-VALID.", "", "           EVALUATE COMM-TITLE", "           WHEN 'Professor'", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Mr       '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Mrs      '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Miss     '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Ms       '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Dr       '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Drs      '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Lord     '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Sir      '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN 'Lady     '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN '         '", "                MOVE 'Y' TO WS-TITLE-VALID", "", "           WHEN OTHER", "                MOVE 'N' TO WS-TITLE-VALID", "           END-EVALUATE.", "", "           IF WS-TITLE-VALID = 'N'", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE 'T' TO COMM-FAIL-CODE", "              GOBACK", "           END-IF", "", "           MOVE SORTCODE TO REQUIRED-SORT-CODE.", "", "", "      *", "      *    Derive the date and time", "      *", "", "           PERFORM POPULATE-TIME-DATE.", "", "      *", "      *    Perform the Asynchronous credit check", "      *", "           PERFORM CREDIT-CHECK.", "", "           IF WS-CREDIT-CHECK-ERROR = 'Y'", "              MOVE 0 TO COMM-CREDIT-SCORE", "", "              STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                     WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                     WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                 INTO COMM-CS-REVIEW-DATE", "              END-STRING", "", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE 'G' TO COMM-FAIL-CODE", "", "              DISPLAY 'WS-CREDIT-CHECK-ERROR = Y, '", "                      ' RESP='", "                      WS-CICS-RESP", "                      ' RESP2='", "                      WS-CICS-RESP2", "              DISPLAY '   Exiting CRECUST. COMMAREA='", "                      DFHCOMMAREA", "              PERFORM GET-ME-OUT-OF-HERE", "", "           END-IF.", "", "           PERFORM DATE-OF-BIRTH-CHECK.", "", "           IF WS-DATE-OF-BIRTH-ERROR = 'Y'", "", "              MOVE 'N' TO COMM-SUCCESS", "              PERFORM GET-ME-OUT-OF-HERE", "", "           END-IF.", "", "      *", "      *    Enqueue the named counter for customer", "      *", "           PERFORM ENQ-NAMED-COUNTER.", "", "      *", "      *    Get the next CUSTOMER number from the CUSTOMER Named Counter", "      *", "           PERFORM UPD-NCS.", "", "      *", "      *    Update the datastore", "      *", "           PERFORM WRITE-CUSTOMER-DB2.", "", "           PERFORM GET-ME-OUT-OF-HERE.", "", "       POPULATE-TIME-DATE SECTION.", "       PTD010.", "", "           EXEC CICS ASKTIME", "                ABSTIME(WS-U-TIME)", "                END-EXEC.", "", "           EXEC CICS FORMATTIME", "                ABSTIME(WS-U-TIME)", "                DDMMYYYY(WS-ORIG-DATE)", "                TIME(PROC-TRAN-TIME OF PROCTRAN-AREA)", "                DATESEP", "                END-EXEC.", "", "       PTD999.", "           EXIT.", "", "", "       ENQ-NAMED-COUNTER SECTION.", "       ENC010.", "           MOVE SORTCODE TO", "              NCS-CUST-NO-TEST-SORT.", "", "           EXEC CICS ENQ", "                RESOURCE(NCS-CUST-NO-NAME)", "                LENGTH(16)", "                RESP(WS-CICS-RESP)", "                RESP2(WS-CICS-RESP2)", "                END-EXEC.", "", "           IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE '3' TO COMM-FAIL-CODE", "              PERFORM GET-ME-OUT-OF-HERE", "           END-IF.", "", "       ENC999.", "           EXIT.", "", "", "       DEQ-NAMED-COUNTER SECTION.", "       DNC010.", "", "           MOVE SORTCODE TO", "              NCS-CUST-NO-TEST-SORT.", "", "      D    EXEC CICS ASKTIME ABSTIME(START-DEQ) END-EXEC", "", "           EXEC CICS DEQ", "                RESOURCE(NCS-CUST-NO-NAME)", "                LENGTH(16)", "                RESP(WS-CICS-RESP)", "                RESP2(WS-CICS-RESP2)", "                END-EXEC.", "", "           IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE '5' TO COMM-FAIL-CODE", "              PERFORM GET-ME-OUT-OF-HERE", "           END-IF.", "", "       DNC999.", "           EXIT.", "", "", "       UPD-NCS SECTION.", "       UN010.", "      *", "      *    Update the Named Counter Server", "      *", "           MOVE 1 TO NCS-CUST-NO-INC.", "", "           PERFORM GET-LAST-CUSTOMER-DB2", "", "           MOVE 'Y' TO NCS-UPDATED.", "", "       UN999.", "           EXIT.", "", "", "", "", "       CREDIT-CHECK SECTION.", "       CC010.", "      *", "      *    Carry out the Credit Check Asynchronously", "      *", "", "", "      *", "      *    Retrieve the table of transaction IDs to use &", "      *    initiate each Asynchronous transaction", "      *", "           MOVE 'CIPCREDCHANN    ' TO WS-CHANNEL-NAME.", "           MOVE 0 TO WS-CHILD-ISSUED-CNT.", "", "           COMPUTE WS-PUT-CONT-LEN = LENGTH OF DFHCOMMAREA.", "", "           PERFORM VARYING WS-CC-CNT FROM 1 BY 1", "              UNTIL WS-CC-CNT > 5", "", "      *", "      *       Use transactions OCR1 - OCR5", "      *", "                   STRING 'OCR' DELIMITED BY SIZE,", "                          WS-CC-CNT DELIMITED BY SIZE", "                      INTO WS-RUN-TRANSID", "                   END-STRING", "", "                   EVALUATE WS-CC-CNT", "                   WHEN 1", "                        MOVE 'CIPA            ' TO WS-PUT-CONT-NAME", "                   WHEN 2", "                        MOVE 'CIPB            ' TO WS-PUT-CONT-NAME", "                   WHEN 3", "                        MOVE 'CIPC            ' TO WS-PUT-CONT-NAME", "                   WHEN 4", "                        MOVE 'CIPD            ' TO WS-PUT-CONT-NAME", "                   WHEN 5", "                        MOVE 'CIPE            ' TO WS-PUT-CONT-NAME", "                   WHEN 6", "                        MOVE 'CIPF            ' TO WS-PUT-CONT-NAME", "                   WHEN 7", "                        MOVE 'CIPG            ' TO WS-PUT-CONT-NAME", "                   WHEN 8", "                        MOVE 'CIPH            ' TO WS-PUT-CONT-NAME", "                   WHEN 9", "                        MOVE 'CIPI            ' TO WS-PUT-CONT-NAME", "", "                   END-EVALUATE", "", "      *", "      *       Pass the details of the customer into a container", "      *", "                   EXEC CICS PUT CONTAINER(WS-PUT-CONT-NAME)", "                        FROM (DFHCOMMAREA)", "                        FLENGTH(WS-PUT-CONT-LEN)", "                        CHANNEL(WS-CHANNEL-NAME)", "                        RESP(WS-CICS-RESP)", "                        RESP2(WS-CICS-RESP2)", "                        END-EXEC", "", "                   IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "                      MOVE 'N' TO COMM-SUCCESS", "                      MOVE 'A' TO COMM-FAIL-CODE", "", "                      DISPLAY 'Unsuccessful attempt to PUT CONTAINER. '", "                              'CONTAINER='", "                              WS-PUT-CONT-NAME", "                              'CHANNEL='", "                              WS-CHANNEL-NAME", "                              '. FLENGTH ='", "                              WS-PUT-CONT-LEN", "                              '.'", "                      DISPLAY '    RESP='", "                              WS-CICS-RESP", "                              ' RESP2='", "                              WS-CICS-RESP2", "", "                      PERFORM GET-ME-OUT-OF-HERE", "                   END-IF", "", "      *", "      *       Issue the ASYNC transaction", "      *", "                   EXEC CICS RUN TRANSID(WS-RUN-TRANSID)", "                        CHANNEL(WS-CHANNEL-NAME)", "                        CHILD(WS-ANY-CHILD-TKN)", "                        RESP(WS-CICS-RESP)", "                        RESP2(WS-CICS-RESP2)", "                        END-EXEC", "", "                   IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "                      MOVE 'N' TO COMM-SUCCESS", "                      MOVE 'B' TO COMM-FAIL-CODE", "", "                      DISPLAY 'Unsuccessful attempt to RUN TRANSID. '", "                              'TRANSID='", "                              WS-RUN-TRANSID", "                              'CHANNEL='", "                              WS-CHANNEL-NAME", "                              '. TOKEN='", "                              WS-ANY-CHILD-TKN", "                      DISPLAY '    RESP='", "                              WS-CICS-RESP", "                              ' RESP2='", "                              WS-CICS-RESP2", "", "                      PERFORM GET-ME-OUT-OF-HERE", "                   END-IF", "", "      *", "      *       Store away the CHANNEL and the TKN into an array", "      *       for later use.", "      *", "                   ADD 1 TO WS-CHILD-ISSUED-CNT", "                   MOVE WS-CHANNEL-NAME TO", "                      WS-CHILD-CHAN(WS-CHILD-ISSUED-CNT)", "                   MOVE WS-ANY-CHILD-TKN TO", "                      WS-CHILD-TKN(WS-CHILD-ISSUED-CNT)", "", "      D       DISPLAY 'WS-CHILD-ARRAY=' WS-CHILD-ARRAY", "", "", "           END-PERFORM.", "", "      *", "      *    Having sent all of the ASYNC requests, delay for", "      *    3 seconds (to allow the request time to be processed)", "      *    and then FETCH any data", "      *", "           EXEC CICS DELAY", "                FOR SECONDS(3)", "                END-EXEC.", "", "           MOVE 'N' TO WS-FINISHED-FETCHING.", "           MOVE 0 TO WS-RETRIEVED-CNT.", "           MOVE 0 TO WS-TOTAL-CS-SCR.", "", "           PERFORM UNTIL WS-FINISHED-FETCHING = 'Y'", "", "                   MOVE SPACES TO WS-ANY-CHILD-FETCH-ABCODE", "", "      *", "      *       Fetch an available reply immediately (without", "      *       waiting).", "      *", "                   EXEC CICS FETCH ANY(WS-ANY-CHILD-FETCH-TKN)", "                        CHANNEL(WS-ANY-CHILD-FETCH-CHAN)", "                        NOSUSPEND", "                        COMPSTATUS(WS-CHILD-FETCH-COMPST)", "                        ABCODE(WS-ANY-CHILD-FETCH-ABCODE)", "                        RESP(WS-CICS-RESP)", "                        RESP2(WS-CICS-RESP2)", "                        END-EXEC", "", "                   IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "      *", "      *          Check to see if the response was NOTFINISHED", "      *          this means that not all credit agencies replied in", "      *          time (for example we asked 5 and only 4 replied in", "      *          the required time frame). So there is no more data", "      *          to retrieve (the outstanding reply remains", "      *          outstanding).", "      *", "                      IF WS-CICS-RESP = DFHRESP(NOTFINISHED) AND", "                         WS-CICS-RESP2 = 52", "", "      *", "      *             If we retrieved nothing at all then it is an", "      *             error", "      *", "                         IF WS-RETRIEVED-CNT = 0", "                            MOVE 'Y' TO WS-FINISHED-FETCHING", "                            MOVE 0 TO COMM-CREDIT-SCORE", "                            MOVE 'Y' TO WS-CREDIT-CHECK-ERROR", "", "                            STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                   WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                   WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                               INTO COMM-CS-REVIEW-DATE", "                            END-STRING", "", "                            MOVE 'N' TO COMM-SUCCESS", "                            MOVE 'C' TO COMM-FAIL-CODE", "", "                            DISPLAY 'EXEC CICS FETCH ANY failed. RESP='", "                                    WS-CICS-RESP", "                                    ' RESP2='", "                                    WS-CICS-RESP2", "                            DISPLAY", "                               '   NOTFINISHED (no data) was returned'", "                            DISPLAY '   Exiting CRECUST. COMMAREA='", "                                    DFHCOMMAREA", "                            PERFORM GET-ME-OUT-OF-HERE", "", "                         ELSE", "      *", "      *                If we have previously retrieved some data from", "      *                the credit checking agency/agencies then", "      *                calculate the average credit score and a", "      *                new random review date (sometime in the", "      *                next 21 days)", "      *", "                            MOVE 'Y' TO WS-FINISHED-FETCHING", "                            MOVE 'N' TO WS-CREDIT-CHECK-ERROR", "      *", "      *                Compute the average credit score from those", "      *                credit agencies that responded", "      *", "                            COMPUTE WS-ACTUAL-CS-SCR = WS-TOTAL-CS-SCR /", "                               WS-RETRIEVED-CNT", "                            MOVE WS-ACTUAL-CS-SCR TO COMM-CREDIT-SCORE", "", "      *", "      *                Get today's date", "      *", "                            MOVE FUNCTION CURRENT-DATE", "                               TO WS-CURRENT-DATE-DATA", "", "                            MOVE WS-CURRENT-DATE-DATA(1:8)", "                               TO WS-CURRENT-DATE-9", "", "                            COMPUTE WS-TODAY-INT =", "                               FUNCTION INTEGER-OF-DATE", "                               (WS-CURRENT-DATE-9)", "", "      *", "      *                Set up a random Credit Score review date", "      *                within the next 21 days.", "      *", "                            MOVE EIBTASKN TO WS-SEED", "", "                            COMPUTE WS-REVIEW-DATE-ADD =((21 - 1)", "                               * FUNCTION RANDOM(WS-SEED)) + 1", "", "                            COMPUTE WS-NEW-REVIEW-DATE-INT =", "                               WS-TODAY-INT + WS-REVIEW-DATE-ADD", "", "      *", "      *                Convert the integer date back to YYYYMMDD", "      *                format", "      *", "                            COMPUTE WS-NEW-REVIEW-YYYYMMDD = FUNCTION", "                               DATE-OF-INTEGER(WS-NEW-REVIEW-DATE-INT)", "", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(1:4) TO", "                               COMM-CS-REVIEW-DATE(5:4)", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(5:2) TO", "                               COMM-CS-REVIEW-DATE(3:2)", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(7:2) TO", "                               COMM-CS-REVIEW-DATE(1:2)", "", "                         END-IF", "                      END-IF", "      *", "      *          Check to see if the response was INVREQ", "      *          this means that the parent never had any children", "      *", "                      IF WS-CICS-RESP = DFHRESP(INVREQ) AND", "                         WS-CICS-RESP2 = 1", "", "                         MOVE 0 TO COMM-CREDIT-SCORE", "", "                         STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                            INTO COMM-CS-REVIEW-DATE", "                         END-STRING", "", "                         MOVE 'N' TO COMM-SUCCESS", "                         MOVE 'D' TO COMM-FAIL-CODE", "", "                         DISPLAY 'EXEC CICS FETCH ANY failed. RESP='", "                                 WS-CICS-RESP", "                                 ' RESP2='", "                                 WS-CICS-RESP2", "                         DISPLAY '   INVREQ (no data) was returned'", "                         DISPLAY '   Exiting CRECUST. COMMAREA='", "                                 DFHCOMMAREA", "                         PERFORM GET-ME-OUT-OF-HERE", "", "                      END-IF", "", "      *", "      *          Check to see if we are finished yet.", "      *", "                      IF WS-CICS-RESP = DFHRESP(NOTFND) AND", "                         WS-CICS-RESP2 = 1", "", "      *", "      *             If we retrieved nothing at all then it is an", "      *             error", "      *", "                         IF WS-RETRIEVED-CNT = 0", "                            MOVE 'Y' TO WS-FINISHED-FETCHING", "                            MOVE 0 TO COMM-CREDIT-SCORE", "", "                            STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                   WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                   WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                               INTO COMM-CS-REVIEW-DATE", "                            END-STRING", "                            MOVE 'Y' TO WS-CREDIT-CHECK-ERROR", "", "                         ELSE", "      *", "      *                If we have previously retrieved data from the", "      *                credit checking agency/agencies then calculate", "      *                the average credit score and a new random", "      *                review date (sometime in the next 21 days)", "      *", "                            MOVE 'Y' TO WS-FINISHED-FETCHING", "                            MOVE 'N' TO WS-CREDIT-CHECK-ERROR", "      *", "      *                Compute the average credit score from those", "      *                credit agencies that responded", "      *", "                            COMPUTE WS-ACTUAL-CS-SCR = WS-TOTAL-CS-SCR /", "                               WS-RETRIEVED-CNT", "                            MOVE WS-ACTUAL-CS-SCR TO COMM-CREDIT-SCORE", "", "      *", "      *                Get today's date", "      *", "                            MOVE FUNCTION CURRENT-DATE", "                               TO WS-CURRENT-DATE-DATA", "", "                            MOVE WS-CURRENT-DATE-DATA(1:8)", "                               TO WS-CURRENT-DATE-9", "", "                            COMPUTE WS-TODAY-INT =", "                               FUNCTION INTEGER-OF-DATE", "                               (WS-CURRENT-DATE-9)", "      *", "      *                Set up a random Credit Score review date", "      *                within the next 21 days.", "      *", "                            MOVE EIBTASKN TO WS-SEED", "", "                            COMPUTE WS-REVIEW-DATE-ADD =((21 - 1)", "                               * FUNCTION RANDOM(WS-SEED)) + 1", "", "                            COMPUTE WS-NEW-REVIEW-DATE-INT =", "                               WS-TODAY-INT + WS-REVIEW-DATE-ADD", "", "      *", "      *                Convert the integer date back to YYYYMMDD", "      *                format", "      *", "                            COMPUTE WS-NEW-REVIEW-YYYYMMDD = FUNCTION", "                               DATE-OF-INTEGER(WS-NEW-REVIEW-DATE-INT)", "", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(1:4) TO", "                               COMM-CS-REVIEW-DATE(5:4)", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(5:2) TO", "                               COMM-CS-REVIEW-DATE(3:2)", "                            MOVE WS-NEW-REVIEW-YYYYMMDD(7:2) TO", "                               COMM-CS-REVIEW-DATE(1:2)", "", "                         END-IF", "                      END-IF", "                   ELSE", "", "      *       If it is a NORMAL RESPONSE code we need to check", "      *       the COMP-STATUS", "      *", "", "                      EVALUATE WS-CHILD-FETCH-COMPST", "", "                      WHEN DFHVALUE(NORMAL)", "      *", "      *                Set up the correct container name", "      *", "                           EVALUATE WS-ANY-CHILD-FETCH-TKN", "", "                           WHEN WS-CHILD-TKN(1)", "                                MOVE 'CIPA            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(2)", "                                MOVE 'CIPB            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(3)", "                                MOVE 'CIPC            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(4)", "                                MOVE 'CIPD            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(5)", "                                MOVE 'CIPE            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(6)", "                                MOVE 'CIPF            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(7)", "                                MOVE 'CIPG            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(8)", "                                MOVE 'CIPH            '", "                                   TO WS-CONTAINER-NAME", "                           WHEN WS-CHILD-TKN(9)", "                                MOVE 'CIPI            '", "                                   TO WS-CONTAINER-NAME", "                           END-EVALUATE", "", "                           COMPUTE WS-CHILD-CONTAINER-LEN =", "                              LENGTH OF WS-CHILD-DATA", "", "                           EXEC CICS GET CONTAINER(WS-CONTAINER-NAME)", "                                CHANNEL(WS-ANY-CHILD-FETCH-CHAN)", "                                INTO (WS-CHILD-DATA)", "                                FLENGTH(WS-CHILD-CONTAINER-LEN)", "                                RESP(WS-CICS-RESP)", "                                RESP2(WS-CICS-RESP2)", "                                END-EXEC", "", "                           IF WS-CICS-RESP NOT = DFHRESP(NORMAL)", "                              MOVE 0 TO COMM-CREDIT-SCORE", "", "                              STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                     WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                     WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                                 INTO COMM-CS-REVIEW-DATE", "                              END-STRING", "", "                              MOVE 'N' TO COMM-SUCCESS", "                              MOVE 'E' TO COMM-FAIL-CODE", "", "                              DISPLAY 'EXEC CICS FETCH ANY worked, '", "                                      'but GET CONTAINER failed.'", "                                      ' CONTAINER='", "                                      WS-CONTAINER-NAME", "                                      ' CHANNEL='", "                                      WS-ANY-CHILD-FETCH-CHAN", "                                      ' RESP='", "                                      WS-CICS-RESP", "                                      ' RESP2='", "                                      WS-CICS-RESP2", "", "                              DISPLAY '   Exiting CRECUST. COMMAREA='", "                                      DFHCOMMAREA", "                              PERFORM GET-ME-OUT-OF-HERE", "                           END-IF", "", "      *", "      *                If the GET CONTAINER was successful", "      *", "                           COMPUTE WS-RETRIEVED-CNT =", "                              WS-RETRIEVED-CNT + 1", "                           COMPUTE WS-TOTAL-CS-SCR =", "                              WS-TOTAL-CS-SCR +", "                              WS-CHILD-CREDIT-SCORE", "", "                      WHEN DFHVALUE(ABEND)", "      *", "      *                You are here because the completion status from", "      *                the FETCH ANY is ABEND, so deal with that.", "      *", "                           MOVE 0 TO COMM-CREDIT-SCORE", "", "                           STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                              INTO COMM-CS-REVIEW-DATE", "                           END-STRING", "", "                           MOVE 'N' TO COMM-SUCCESS", "                           MOVE 'F' TO COMM-FAIL-CODE", "", "                           PERFORM GET-ME-OUT-OF-HERE", "", "", "                      WHEN DFHVALUE(SECERROR)", "      *", "      *                The completion status from the FETCH ANY is", "      *                SECERROR", "      *", "                           MOVE 0 TO COMM-CREDIT-SCORE", "", "                           STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                              INTO COMM-CS-REVIEW-DATE", "                           END-STRING", "", "                           MOVE 'N' TO COMM-SUCCESS", "                           MOVE 'G' TO COMM-FAIL-CODE", "", "                           DISPLAY 'EXEC CICS FETCH ANY worked, '", "                                   'but COMP-STATUS = SECERROR.'", "                                   ' RESP='", "                                   WS-CICS-RESP", "                                   ' RESP2='", "                                   WS-CICS-RESP2", "                           DISPLAY '   Exiting CRECUST. COMMAREA='", "                                   DFHCOMMAREA", "                           PERFORM GET-ME-OUT-OF-HERE", "", "", "                      WHEN OTHER", "      *", "      *                This catches any other completion status values", "      *                from the FETCH ANY.", "      *", "                           MOVE 0 TO COMM-CREDIT-SCORE", "", "                           STRING WS-ORIG-DATE-DD DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-MM DELIMITED BY SIZE,", "                                  WS-ORIG-DATE-YYYY DELIMITED BY SIZE", "                              INTO COMM-CS-REVIEW-DATE", "                           END-STRING", "", "                           MOVE 'N' TO COMM-SUCCESS", "                           MOVE 'H' TO COMM-FAIL-CODE", "", "                           DISPLAY 'EXEC CICS FETCH ANY worked, '", "                                   'but COMP-STATUS IS UNKNOWN.'", "                                   ' RESP='", "                                   WS-CICS-RESP", "                                   ' RESP2='", "                                   WS-CICS-RESP2", "                           DISPLAY '   Exiting CRECUST. COMMAREA='", "                                   DFHCOMMAREA", "                           PERFORM GET-ME-OUT-OF-HERE", "", "                      END-EVALUATE", "", "                   END-IF", "", "           END-PERFORM.", "", "", "       CC999.", "           EXIT.", "", "", "       WRITE-CUSTOMER-DB2 SECTION.", "       WCD010.", "      *", "      *    Write a record to the CUSTOMER DB2 table", "      *", "           INITIALIZE OUTPUT-DATA.", "           INITIALIZE HOST-CUSTOMER-ROW.", "", "           MOVE 'CUST' TO CUSTOMER-EYECATCHER.", "           MOVE SORTCODE TO CUSTOMER-SORTCODE.", "           MOVE NCS-CUST-NO-VALUE TO CUSTOMER-NUMBER.", "           MOVE COMM-NAME TO CUSTOMER-NAME.", "           MOVE COMM-DOB TO CUSTOMER-DOB.", "           MOVE COMM-PHONE TO CUSTOMER-PHONE.", "           MOVE COMM-ADDR TO CUSTOMER-ADDRESS.", "           MOVE COMM-STATUS TO CUSTOMER-STATUS.", "           MOVE COMM-CREATED-DATE TO CUSTOMER-CREATED-DATE.", "           MOVE COMM-CREDIT-SCORE TO CUSTOMER-CREDIT-SCORE.", "           MOVE COMM-CS-REVIEW-DATE TO CUSTOMER-CS-REVIEW-DATE.", "", "      *", "      *    Populate host variables for DB2 INSERT", "      *", "           MOVE 'CUST' TO HV-CUSTOMER-EYECATCHER.", "           MOVE SORTCODE TO HV-CUSTOMER-SORTCODE.", "           MOVE WS-CUSTOMER-NO-NUM TO HV-CUSTOMER-NUMBER.", "           MOVE COMM-TITLE OF COMM-NAME TO HV-CUSTOMER-TITLE.", "           MOVE COMM-FIRST-NAME OF COMM-NAME TO HV-CUSTOMER-FIRST-NAME.", "           MOVE COMM-LAST-NAME OF COMM-NAME TO HV-CUSTOMER-LAST-NAME.", "           COMPUTE HV-CUSTOMER-DOB =", "              (COMM-DOB-YEAR * 10000) +", "              (COMM-DOB-MONTH * 100) +", "              COMM-DOB-DAY.", "           MOVE COMM-PHONE TO HV-CUSTOMER-PHONE.", "           MOVE COMM-ADDR-LINE1 OF COMM-ADDR", "              TO HV-CUSTOMER-ADDR-LINE1.", "           MOVE COMM-ADDR-LINE2 OF COMM-ADDR", "              TO HV-CUSTOMER-ADDR-LINE2.", "           MOVE COMM-CITY OF COMM-ADDR TO HV-CUSTOMER-CITY.", "           MOVE COMM-POSTCODE OF COMM-ADDR TO HV-CUSTOMER-POSTCODE.", "           MOVE COMM-COUNTRY OF COMM-ADDR TO HV-CUSTOMER-COUNTRY.", "           MOVE COMM-STATUS TO HV-CUSTOMER-STATUS.", "           ", "      *", "      * Convert created date to INTEGER format (YYYYMMDD)", "      *", "           COMPUTE HV-CUSTOMER-CREATE-DATE =", "              (COMM-CREATED-YEAR OF COMM-CREATED-DATE * 10000) +", "              (COMM-CREATED-MONTH OF COMM-CREATED-DATE * 100) +", "              COMM-CREATED-DAY OF COMM-CREATED-DATE.", "              ", "           MOVE COMM-CREDIT-SCORE TO HV-CUSTOMER-CREDIT-SCORE.", "           ", "      *", "      * Convert CS review date to INTEGER format (YYYYMMDD)", "      *", "           COMPUTE HV-CUSTOMER-CS-REVIEW-DATE =", "              (COMM-CS-REVIEW-YEAR OF COMM-CS-REVIEW-DATE * 10000) +", "              (COMM-CS-REVIEW-MONTH OF COMM-CS-REVIEW-DATE * 100) +", "              COMM-CS-REVIEW-DAY OF COMM-CS-REVIEW-DATE.", "", "           DISPLAY 'CUSTOMER-EYECATCHER: ' CUSTOMER-EYECATCHER", "           DISPLAY 'CUSTOMER-SORTCODE: ' CUSTOMER-SORTCODE", "           DISPLAY 'CUSTOMER-NUMBER: ' CUSTOMER-NUMBER", "           DISPLAY 'CUSTOMER-FIRST-NAME: ' CUSTOMER-FIRST-NAME", "           DISPLAY 'CUSTOMER-LAST-NAME: ' CUSTOMER-LAST-NAME", "           DISPLAY 'CUSTOMER-DOB: ' CUSTOMER-DOB-DAY OF CUSTOMER-DOB", "              '/' CUSTOMER-DOB-MONTH OF CUSTOMER-DOB", "              '/' CUSTOMER-DOB-YEAR OF CUSTOMER-DOB", "", "           DISPLAY 'HV-CUSTOMER-EYECATCHER: ' HV-CUSTOMER-EYECATCHER", "           DISPLAY 'HV-CUSTOMER-SORTCODE: ' HV-CUSTOMER-SORTCODE", "           DISPLAY 'HV-CUSTOMER-NUMBER: ' HV-CUSTOMER-NUMBER", "           DISPLAY 'HV-CUSTOMER-FIRST-NAME: ' HV-CUSTOMER-FIRST-NAME", "           DISPLAY 'HV-CUSTOMER-LAST-NAME: ' HV-CUSTOMER-LAST-NAME", "           DISPLAY 'HV-CUSTOMER-DOB: ' HV-CUSTOMER-DOB", "           DISPLAY 'HV-CUSTOMER-CREDIT-SCOR: ' HV-CUSTOMER-CREDIT-SCORE", "           DISPLAY 'HV-CUSTOMER-CS-DATE: ' HV-CUSTOMER-CS-REVIEW-DATE", "      *", "      *    Insert customer record into DB2", "      *", "           EXEC SQL", "              INSERT INTO CUSTOMER", "                 (CUSTOMER_EYECATCHER,", "                  CUSTOMER_SORTCODE,", "                  CUSTOMER_NUMBER,", "                  CUSTOMER_TITLE,", "                  CUSTOMER_FIRST_NAME,", "                  CUSTOMER_LAST_NAME,", "                  CUSTOMER_DATE_OF_BIRTH,", "                  CUSTOMER_PHONE,", "                  CUSTOMER_ADDR_LINE1,", "                  CUSTOMER_ADDR_LINE2,", "                  CUSTOMER_CITY,", "                  CUSTOMER_POSTCODE,", "                  CUSTOMER_COUNTRY,", "                  CUSTOMER_STATUS,", "                  CUSTOMER_CREATED_DATE,", "                  CUSTOMER_CREDIT_SCORE,", "                  CUSTOMER_CS_REVIEW_DATE)", "              VALUES", "                 (:HV-CUSTOMER-EYECATCHER,", "                  :HV-CUSTOMER-SORTCODE,", "                  :HV-CUSTOMER-NUMBER,", "                  :HV-CUSTOMER-TITLE,", "                  :HV-CUSTOMER-FIRST-NAME,", "                  :HV-CUSTOMER-LAST-NAME,", "                  :HV-CUSTOMER-DOB,", "                  :HV-CUSTOMER-PHONE,", "                  :HV-CUSTOMER-ADDR-LINE1,", "                  :HV-CUSTOMER-ADDR-LINE2,", "                  :HV-CUSTOMER-CITY,", "                  :HV-CUSTOMER-POSTCODE,", "                  :HV-CUSTOMER-COUNTRY,", "                  :HV-CUSTOMER-STATUS,", "                  :HV-CUSTOMER-CREATE-DATE,", "                  :HV-CUSTOMER-CREDIT-SCORE,", "                  :HV-CUSTOMER-CS-REVIEW-DATE)", "           END-EXEC.", "", "      *", "      *    Check if the INSERT was unsuccessful and take action.", "      *", "           IF SQLCODE NOT = 0", "              MOVE SQLCODE TO SQLCODE-DISPLAY", "              DISPLAY 'CRECUST - INSERT CUSTOMER failed. SQLCODE='", "                      SQLCODE-DISPLAY", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE '1' TO COMM-FAIL-CODE", "              PERFORM DEQ-NAMED-COUNTER", "              PERFORM GET-ME-OUT-OF-HERE", "           END-IF.", "", "      *", "      *    Note: CONTROL table already updated in GET-LAST-CUSTOMER-DB2", "      *    No additional update needed here", "", "      *", "      *    If the WRITE was successful then WRITE to PROCTRAN datastore", "      *", "           MOVE CUSTOMER-SORTCODE OF OUTPUT-DATA TO STORED-SORTCODE.", "           MOVE CUSTOMER-NUMBER OF OUTPUT-DATA TO STORED-CUSTNO.", "           STRING CUSTOMER-FIRST-NAME OF CUSTOMER-NAME", "                  DELIMITED BY '  '", "                  ' ' DELIMITED BY SIZE", "                  CUSTOMER-LAST-NAME OF CUSTOMER-NAME", "                  DELIMITED BY '  '", "              INTO STORED-NAME", "           END-STRING.", "           MOVE CUSTOMER-DOB-DAY OF CUSTOMER-DOB TO STORED-DOB(1:2).", "           MOVE '/' TO STORED-DOB(3:1).", "           MOVE CUSTOMER-DOB-MONTH OF CUSTOMER-DOB TO STORED-DOB(4:2).", "           MOVE '/' TO STORED-DOB(6:1).", "           MOVE CUSTOMER-DOB-YEAR OF CUSTOMER-DOB TO STORED-DOB(7:4).", "", "           PERFORM WRITE-PROCTRAN.", "", "           PERFORM DEQ-NAMED-COUNTER.", "", "      *", "      *    Set up the missing data in the COMM AREA ready for return", "      *", "           MOVE CUSTOMER-SORTCODE OF OUTPUT-DATA", "              TO COMM-SORTCODE.", "           MOVE CUSTOMER-NUMBER OF OUTPUT-DATA", "              TO COMM-NUMBER", "           MOVE 'CUST' TO COMM-EYECATCHER.", "           MOVE 'Y' TO COMM-SUCCESS.", "           MOVE ' ' TO COMM-FAIL-CODE.", "", "       WCV999.", "           EXIT.", "", "", "       WRITE-PROCTRAN SECTION.", "       WP010.", "           PERFORM WRITE-PROCTRAN-DB2.", "", "       WP999.", "           EXIT.", "", "", "       WRITE-PROCTRAN-DB2 SECTION.", "       WPD010.", "      *", "      *    Record the creation of a new CUSTOMER on PROCTRAN", "      *", "           INITIALIZE HOST-PROCTRAN-ROW.", "           INITIALIZE WS-EIBTASKN12.", "", "           MOVE 'PRTR' TO HV-PROCTRAN-EYECATCHER.", "           MOVE SORTCODE TO HV-PROCTRAN-SORT-CODE.", "           MOVE ZEROS TO HV-PROCTRAN-ACC-NUMBER.", "           MOVE EIBTASKN TO WS-EIBTASKN12.", "           MOVE WS-EIBTASKN12 TO HV-PROCTRAN-REF.", "", "      *", "      *    Populate the time and date", "      *", "           EXEC CICS ASKTIME", "                ABSTIME(WS-U-TIME)", "                END-EXEC.", "", "           EXEC CICS FORMATTIME", "                ABSTIME(WS-U-TIME)", "                DDMMYYYY(WS-ORIG-DATE)", "                TIME(HV-PROCTRAN-TIME)", "                DATESEP('.')", "                END-EXEC.", "", "           MOVE WS-ORIG-DATE TO WS-ORIG-DATE-GRP-X.", "           MOVE WS-ORIG-DATE-GRP-X TO HV-PROCTRAN-DATE.", "", "           MOVE STORED-SORTCODE TO HV-PROCTRAN-DESC(1:6).", "           MOVE STORED-CUSTNO TO HV-PROCTRAN-DESC(7:10).", "           MOVE STORED-NAME TO HV-PROCTRAN-DESC(17:14).", "           MOVE STORED-DOB TO HV-PROCTRAN-DESC(31:10).", "", "           MOVE 'OCC' TO HV-PROCTRAN-TYPE.", "           MOVE ZEROS TO HV-PROCTRAN-AMOUNT.", "", "           EXEC SQL", "              INSERT INTO PROCTRAN", "                     (", "                      PROCTRAN_EYECATCHER,", "                      PROCTRAN_SORTCODE,", "                      PROCTRAN_NUMBER,", "                      PROCTRAN_DATE,", "                      PROCTRAN_TIME,", "                      PROCTRAN_REF,", "                      PROCTRAN_TYPE,", "                      PROCTRAN_DESC,", "                      PROCTRAN_AMOUNT", "                     )", "              VALUES", "                     (", "                      :HV-PROCTRAN-EYECATCHER,", "                      :HV-PROCTRAN-SORT-CODE,", "                      :HV-PROCTRAN-ACC-NUMBER,", "                      :HV-PROCTRAN-DATE,", "                      :HV-PROCTRAN-TIME,", "                      :HV-PROCTRAN-REF,", "                      :HV-PROCTRAN-TYPE,", "                      :HV-PROCTRAN-DESC,", "                      :HV-PROCTRAN-AMOUNT", "                     )", "           END-EXEC.", "", "      *", "      *    Check the SQLCODE", "      *", "           IF SQLCODE NOT = 0", "              MOVE SQLCODE TO SQLCODE-DISPLAY", "      *", "      *       Preserve the RESP and RESP2, then set up the", "      *       standard ABEND info before getting the applid,", "      *       date/time etc. and linking to the Abend Handler", "      *       program.", "      *", "              INITIALIZE ABNDINFO-REC", "              MOVE EIBRESP TO ABND-RESPCODE", "              MOVE EIBRESP2 TO ABND-RESP2CODE", "      *", "      *       Get supplemental information", "      *", "              EXEC CICS ASSIGN APPLID(ABND-APPLID)", "                   END-EXEC", "", "              MOVE EIBTASKN TO ABND-TASKNO-KEY", "              MOVE EIBTRNID TO ABND-TRANID", "", "              PERFORM POPULATE-TIME-DATE2", "", "              MOVE WS-ORIG-DATE TO ABND-DATE", "              STRING WS-TIME-NOW-GRP-HH DELIMITED BY SIZE,", "                     ':' DELIMITED BY SIZE,", "                     WS-TIME-NOW-GRP-MM DELIMITED BY SIZE,", "                     ':' DELIMITED BY SIZE,", "                     WS-TIME-NOW-GRP-SS DELIMITED BY SIZE", "                 INTO ABND-TIME", "              END-STRING", "", "              MOVE WS-U-TIME TO ABND-UTIME-KEY", "              MOVE 'HWPT' TO ABND-CODE", "", "              EXEC CICS ASSIGN PROGRAM(ABND-PROGRAM)", "                   END-EXEC", "", "              MOVE SQLCODE-DISPLAY TO ABND-SQLCODE", "", "              STRING 'WPD010  - Unable to write to PROCTRAN DB2 '", "                 DELIMITED BY SIZE,", "                     'datastore with the following data:'", "                 DELIMITED BY SIZE,", "                     HOST-PROCTRAN-ROW", "                 DELIMITED BY SIZE,", "                     ' EIBRESP=' DELIMITED BY SIZE,", "                     ABND-RESPCODE DELIMITED BY SIZE,", "                     ' RESP2=' DELIMITED BY SIZE,", "                     ABND-RESP2CODE DELIMITED BY SIZE", "                 INTO ABND-FREEFORM", "              END-STRING", "", "              EXEC CICS LINK PROGRAM(WS-ABEND-PGM)", "                   COMMAREA(ABNDINFO-REC)", "                   END-EXEC", "", "              DISPLAY 'In CRECUST(WPD010) '", "                      'UNABLE TO WRITE TO PROCTRAN DB2 DATASTORE'", "                      ' SQLCODE='", "                      SQLCODE-DISPLAY", "                      'WITH THE FOLLOWING DATA:'", "                      HOST-PROCTRAN-ROW", "", "", "              PERFORM DEQ-NAMED-COUNTER", "", "              EXEC CICS ABEND", "                   ABCODE('HWPT')", "                   END-EXEC", "           END-IF.", "", "       WPD999.", "           EXIT.", "", "", "       GET-ME-OUT-OF-HERE SECTION.", "       GMOFH010.", "      *", "      *    Finish", "      *", "           EXEC CICS RETURN", "                END-EXEC.", "", "       GMOFH999.", "           EXIT.", "", "", "       GET-LAST-CUSTOMER-DB2 SECTION.", "       GLCD010.", "      *", "      *    Get and increment the customer number from DB2 CONTROL table", "      *", "           INITIALIZE HV-CONTROL-NAME", "           MOVE SORTCODE TO NCS-CUST-NO-TEST-SORT", "           STRING NCS-CUST-NO-ACT-NAME", "                  NCS-CUST-NO-TEST-SORT", "                  NCS-CUST-NO-FILL", "              DELIMITED BY SIZE", "              INTO HV-CONTROL-NAME", "           END-STRING", "", "      *", "      *    Select current customer number from CONTROL table", "      *", "           DISPLAY 'CRECUST - Searching for CONTROL_NAME=['", "                   HV-CONTROL-NAME(1:16)", "                   ']'", "           EXEC SQL", "              SELECT CONTROL_VALUE_NUM", "                INTO :HV-CONTROL-VALUE-NUM", "                FROM CONTROL", "               WHERE CONTROL_NAME = :HV-CONTROL-NAME", "           END-EXEC.", "", "           IF SQLCODE NOT = 0", "              MOVE SQLCODE TO SQLCODE-DISPLAY", "              DISPLAY 'CRECUST - SELECT CONTROL failed. SQLCODE='", "                      SQLCODE-DISPLAY", "              DISPLAY 'CRECUST - CONTROL_NAME was: ['", "                      HV-CONTROL-NAME(1:16)", "                      ']'", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE '4' TO COMM-FAIL-CODE", "              PERFORM DEQ-NAMED-COUNTER", "              PERFORM GET-ME-OUT-OF-HERE", "           END-IF.", "", "      *", "      *    Increment the customer number", "      *", "           ADD 1 TO HV-CONTROL-VALUE-NUM.", "", "      *", "      *    Update the CONTROL table with new customer number", "      *", "           EXEC SQL", "              UPDATE CONTROL", "                 SET CONTROL_VALUE_NUM = :HV-CONTROL-VALUE-NUM", "               WHERE CONTROL_NAME = :HV-CONTROL-NAME", "           END-EXEC.", "", "           IF SQLCODE NOT = 0", "              MOVE SQLCODE TO SQLCODE-DISPLAY", "              DISPLAY 'CRECUST - UPDATE CONTROL failed. SQLCODE='", "                      SQLCODE-DISPLAY", "              MOVE 'N' TO COMM-SUCCESS", "              MOVE '4' TO COMM-FAIL-CODE", "              PERFORM DEQ-NAMED-COUNTER", "              PERFORM GET-ME-OUT-OF-HERE", "           END-IF.", "", "      *", "      *    Set the new customer number in various fields", "      *    Convert from COMP to DISPLAY via intermediate field", "      *", "           MOVE HV-CONTROL-VALUE-NUM TO WS-CUSTOMER-NO-NUM", "           MOVE WS-CUSTOMER-NO-NUM TO", "              COMM-NUMBER", "              CUSTOMER-NUMBER", "              REQUIRED-CUST-NUMBER2", "           MOVE HV-CONTROL-VALUE-NUM TO NCS-CUST-NO-VALUE.", "", "       GLCV999.", "           EXIT.", "", "", "       DATE-OF-BIRTH-CHECK SECTION.", "       DOBC010.", "      *", "      *    Ensure that the Date Of Birth is valid", "      *", "           IF COMM-DOB-YEAR OF COMM-DOB < 1601", "              MOVE 'Y' TO WS-DATE-OF-BIRTH-ERROR", "              MOVE 'O' TO COMM-FAIL-CODE", "              GO TO DOBC999", "           END-IF.", "", "           MOVE COMM-DOB-YEAR OF COMM-DOB TO CEEDAYS-YEAR.", "           MOVE COMM-DOB-MONTH OF COMM-DOB TO CEEDAYS-MONTH.", "           MOVE COMM-DOB-DAY OF COMM-DOB TO CEEDAYS-DAY.", "", "           CALL \"CEEDAYS\" USING DATE-OF-BIRTH-FOR-CEEDAYS", "                                DATE-OF-BIRTH-FORMAT,", "                                WS-DATE-OF-BIRTH-LILLIAN,", "                                FC.", "", "           IF NOT CEE000 OF FC THEN", "              MOVE 'Y' TO WS-DATE-OF-BIRTH-ERROR", "              MOVE 'Z' TO COMM-FAIL-CODE", "              DISPLAY 'CEEDAYS failed, FORMAT LENGTH 10 with msg '", "                      MSG-NO OF FC", "                      ' for date YYYYMMDD'", "                      DATE-OF-BIRTH-FOR-CEEDAYS", "              GO TO DOBC999", "           END-IF.", "", "           CALL \"CEELOCT\" USING WS-TODAY-LILLIAN,", "                                WS-TODAY-SECONDS,", "                                WS-TODAY-GREGORIAN,", "                                FC.", "", "           IF NOT CEE000 OF FC THEN", "              MOVE 'Y' TO WS-DATE-OF-BIRTH-ERROR", "              DISPLAY 'CEEDLOCT failed with msg '", "                      MSG-NO OF FC", "              GO TO DOBC999", "           END-IF.", "", "           SUBTRACT COMM-DOB-YEAR OF COMM-DOB FROM WS-TODAY-G-YEAR", "              GIVING WS-CUSTOMER-AGE", "", "           IF WS-CUSTOMER-AGE > 150", "              MOVE 'Y' TO WS-DATE-OF-BIRTH-ERROR", "              MOVE 'O' TO COMM-FAIL-CODE", "              GO TO DOBC999", "           END-IF.", "", "           IF WS-TODAY-LILLIAN < WS-DATE-OF-BIRTH-LILLIAN", "              MOVE 'Y' TO WS-DATE-OF-BIRTH-ERROR", "              MOVE 'Y' TO COMM-FAIL-CODE", "           END-IF.", "", "       DOBC999.", "           EXIT.", "", "", "       POPULATE-TIME-DATE2 SECTION.", "       PTD2010.", "      D    DISPLAY 'POPULATE-TIME-DATE2 SECTION'.", "", "           EXEC CICS ASKTIME", "                ABSTIME(WS-U-TIME)", "                END-EXEC.", "", "           EXEC CICS FORMATTIME", "                ABSTIME(WS-U-TIME)", "                DDMMYYYY(WS-ORIG-DATE)", "                TIME(WS-TIME-NOW)", "                DATESEP", "                END-EXEC.", "", "       PTD2999.", "           EXIT."];
+const TESTS = {"T1": {"name": "New Customer Record Creation", "input_source": "DFHCOMMAREA (LINKAGE SECTION, COPY CRECUST)", "input": {"COMM-EYECATCHER": "    ", "COMM-SORTCODE": "000000", "COMM-NUMBER": "0000000000", "COMM-TITLE": "Mr        ", "COMM-FIRST-NAME": "John                                              ", "COMM-LAST-NAME": "Smith                                             ", "COMM-DOB-DAY": "15", "COMM-DOB-MONTH": "06", "COMM-DOB-YEAR": "1985", "COMM-PHONE": "07700900123         ", "COMM-ADDR-LINE1": "12 High Street                                    ", "COMM-ADDR-LINE2": "Flat 3                                            ", "COMM-CITY": "London                                            ", "COMM-POSTCODE": "SW1A 1AA  ", "COMM-COUNTRY": "United Kingdom                                    ", "COMM-STATUS": "ACTIVE    ", "COMM-CREATED-DAY": "15", "COMM-CREATED-MONTH": "03", "COMM-CREATED-YEAR": "2024", "COMM-CREDIT-SCORE": "000", "COMM-CS-REVIEW-DAY": "00", "COMM-CS-REVIEW-MONTH": "00", "COMM-CS-REVIEW-YEAR": "0000", "COMM-SUCCESS": " ", "COMM-FAIL-CODE": " "}, "output": {"COMM-SORTCODE": "987654", "COMM-NUMBER": "0000000101", "COMM-EYECATCHER": "CUST", "COMM-SUCCESS": "Y", "COMM-FAIL-CODE": " "}, "ret": {"COMM-SUCCESS": "Y"}, "tps": [{"id": "CRECUST_OP_001", "type": "CICS", "lines": "525-527", "order": 1, "snippet": "EXEC CICS ASKTIME\nABSTIME(WS-U-TIME)\nEND-EXEC.\n", "input": {}, "expected": {"WS-U-TIME": "003919487400000"}}, {"id": "CRECUST_OP_002", "type": "CICS", "lines": "529-534", "order": 2, "snippet": "EXEC CICS FORMATTIME\nABSTIME(WS-U-TIME)\nDDMMYYYY(WS-ORIG-DATE)\nTIME(PROC-TRAN-TIME OF PROCTRAN-AREA)\nDATESEP\nEND-EXEC.\n", "input": {"WS-U-TIME": "003919487400000"}, "expected": {"WS-ORIG-DATE": "15/03/2024", "PROC-TRAN-TIME": "103000"}}, {"id": "CRECUST_OP_003", "type": "CICS", "lines": "687-692", "order": 3, "snippet": "EXEC CICS RUN TRANSID(WS-RUN-TRANSID)\nCHANNEL(WS-CHANNEL-NAME)\nCHILD(WS-ANY-CHILD-TKN)\nRESP(WS-CICS-RESP)\nRESP2(WS-CICS-RESP2)\nEND-EXEC\n", "input": {"WS-RUN-TRANSID": "OCR1", "WS-CHANNEL-NAME": "CIPCREDCHANN    "}, "expected": {"WS-ANY-CHILD-TKN": "CHILDTKN00000001", "WS-CICS-RESP": "0", "WS-CICS-RESP2": "0"}}, {"id": "CRECUST_OP_004", "type": "SQL", "lines": "1496-1501", "order": 4, "snippet": "EXEC SQL\nSELECT CONTROL_VALUE_NUM\nINTO :HV-CONTROL-VALUE-NUM\nFROM CONTROL\nWHERE CONTROL_NAME = :HV-CONTROL-NAME\nEND-EXEC.\n", "input": {"HV-CONTROL-NAME": "BANKZCUST987654                 "}, "expected": {"HV-CONTROL-VALUE-NUM": "100", "SQLCODE": "0"}}, {"id": "CRECUST_OP_005", "type": "SQL", "lines": "1524-1528", "order": 5, "snippet": "EXEC SQL\nUPDATE CONTROL\nSET CONTROL_VALUE_NUM = :HV-CONTROL-VALUE-NUM\nWHERE CONTROL_NAME = :HV-CONTROL-NAME\nEND-EXEC.\n", "input": {"HV-CONTROL-VALUE-NUM": "101", "HV-CONTROL-NAME": "BANKZCUST987654                 "}, "expected": {"SQLCODE": "0"}}, {"id": "CRECUST_OP_006", "type": "SQL", "lines": "1219-1256", "order": 6, "snippet": "EXEC SQL\nINSERT INTO CUSTOMER\n(CUSTOMER_EYECATCHER,\nCUSTOMER_SORTCODE,\nCUSTOMER_NUMBER,\nCUSTOMER_TITLE,\nCUSTOMER_FIRST_NAME,\nCUSTOMER_LAST_NAME,\nCUSTOMER_DATE_OF_BIRTH,\nCUSTOMER_PHONE,\nCUSTOMER_ADDR_LINE1,\nCUSTOMER_ADDR_LINE2,\nCUSTOMER_CITY,\nCUSTOMER_POSTCODE,\nCUSTOMER_COUNTRY,\nCUSTOMER_STATUS,\nCUSTOMER_CREATED_DATE,\nCUSTOMER_CREDIT_SCORE,\nCUSTOMER_CS_REVIEW_DATE)\nVALUES\n(:HV-CUSTOMER-EYECATCHER,\n:HV-CUSTOMER-SORTCODE,\n:HV-CUSTOMER-NUMBER,\n:HV-CUSTOMER-TITLE,\n:HV-CUSTOMER-FIRST-NAME,\n:HV-CUSTOMER-LAST-NAME,\n:HV-CUSTOMER-DOB,\n:HV-CUSTOMER-PHONE,\n:HV-CUSTOMER-ADDR-LINE1,\n:HV-CUSTOMER-ADDR-LINE2,\n:HV-CUSTOMER-CITY,\n:HV-CUSTOMER-POSTCODE,\n:HV-CUSTOMER-COUNTRY,\n:HV-CUSTOMER-STATUS,\n:HV-CUSTOMER-CREATE-DATE,\n:HV-CUSTOMER-CREDIT-SCORE,\n:HV-CUSTOMER-CS-REVIEW-DATE)\nEND-EXEC.\n", "input": {"HV-CUSTOMER-EYECATCHER": "CUST", "HV-CUSTOMER-SORTCODE": "987654", "HV-CUSTOMER-NUMBER": "0000000101", "HV-CUSTOMER-TITLE": "Mr        ", "HV-CUSTOMER-FIRST-NAME": "John                                              ", "HV-CUSTOMER-LAST-NAME": "Smith                                             ", "HV-CUSTOMER-DOB": "19850615", "HV-CUSTOMER-PHONE": "07700900123         ", "HV-CUSTOMER-ADDR-LINE1": "12 High Street                                    ", "HV-CUSTOMER-ADDR-LINE2": "Flat 3                                            ", "HV-CUSTOMER-CITY": "London                                            ", "HV-CUSTOMER-POSTCODE": "SW1A 1AA  ", "HV-CUSTOMER-COUNTRY": "United Kingdom                                    ", "HV-CUSTOMER-STATUS": "ACTIVE    ", "HV-CUSTOMER-CREATE-DATE": "20240315"}, "expected": {"SQLCODE": "0"}}, {"id": "CRECUST_OP_007", "type": "CICS", "lines": "1337-1339", "order": 7, "snippet": "EXEC CICS ASKTIME\nABSTIME(WS-U-TIME)\nEND-EXEC.\n", "input": {}, "expected": {"WS-U-TIME": "003919487400000"}}, {"id": "CRECUST_OP_008", "type": "CICS", "lines": "1341-1346", "order": 8, "snippet": "EXEC CICS FORMATTIME\nABSTIME(WS-U-TIME)\nDDMMYYYY(WS-ORIG-DATE)\nTIME(HV-PROCTRAN-TIME)\nDATESEP('.')\nEND-EXEC.\n", "input": {"WS-U-TIME": "003919487400000"}, "expected": {"WS-ORIG-DATE": "15.03.2024", "HV-PROCTRAN-TIME": "103000"}}, {"id": "CRECUST_OP_009", "type": "SQL", "lines": "1359-1384", "order": 9, "snippet": "EXEC SQL\nINSERT INTO PROCTRAN\n(\nPROCTRAN_EYECATCHER,\nPROCTRAN_SORTCODE,\nPROCTRAN_NUMBER,\nPROCTRAN_DATE,\nPROCTRAN_TIME,\nPROCTRAN_REF,\nPROCTRAN_TYPE,\nPROCTRAN_DESC,\nPROCTRAN_AMOUNT\n)\nVALUES\n(\n:HV-PROCTRAN-EYECATCHER,\n:HV-PROCTRAN-SORT-CODE,\n:HV-PROCTRAN-ACC-NUMBER,\n:HV-PROCTRAN-DATE,\n:HV-PROCTRAN-TIME,\n:HV-PROCTRAN-REF,\n:HV-PROCTRAN-TYPE,\n:HV-PROCTRAN-DESC,\n:HV-PROCTRAN-AMOUNT\n)\nEND-EXEC.\n", "input": {"HV-PROCTRAN-EYECATCHER": "PRTR", "HV-PROCTRAN-SORT-CODE": "987654", "HV-PROCTRAN-ACC-NUMBER": "00000000", "HV-PROCTRAN-DATE": "15.03.2024", "HV-PROCTRAN-TIME": "103000", "HV-PROCTRAN-REF": "000000012345", "HV-PROCTRAN-TYPE": "OCC", "HV-PROCTRAN-DESC": "9876540000000101John Smith    15/06/1985", "HV-PROCTRAN-AMOUNT": "000000000000"}, "expected": {"SQLCODE": "0"}}]}, "T2": {"name": "Unique Customer Number Allocation", "input_source": "DFHCOMMAREA (LINKAGE SECTION, COPY CRECUST) and SORTCODE (COPY SORTCODE)", "input": {"COMM-TITLE": "Mr        ", "SORTCODE": "987654"}, "output": {"COMM-NUMBER": "0000001001"}, "ret": {"SQLCODE": "0", "WS-CICS-RESP": "0"}, "tps": [{"id": "CRECUST_OP_001", "type": "CICS", "lines": "545-550", "order": 1, "snippet": "EXEC CICS ENQ\n     RESOURCE(NCS-CUST-NO-NAME)\n     LENGTH(16)\n     RESP(WS-CICS-RESP)\n     RESP2(WS-CICS-RESP2)\n     END-EXEC.\n", "input": {"NCS-CUST-NO-ACT-NAME": "BANKZCUST", "NCS-CUST-NO-TEST-SORT": "987654", "NCS-CUST-NO-FILL": "  ", "NCS-CUST-NO-NAME": "BANKZCUST987654  "}, "expected": {"WS-CICS-RESP": "0", "WS-CICS-RESP2": "0"}}, {"id": "CRECUST_OP_002", "type": "SQL", "lines": "1496-1501", "order": 2, "snippet": "EXEC SQL\n   SELECT CONTROL_VALUE_NUM\n     INTO :HV-CONTROL-VALUE-NUM\n     FROM CONTROL\n    WHERE CONTROL_NAME = :HV-CONTROL-NAME\nEND-EXEC.\n", "input": {"HV-CONTROL-NAME": "BANKZCUST987654                 "}, "expected": {"HV-CONTROL-VALUE-NUM": "1000", "SQLCODE": "0"}}, {"id": "CRECUST_OP_003", "type": "SQL", "lines": "1524-1528", "order": 3, "snippet": "EXEC SQL\n   UPDATE CONTROL\n      SET CONTROL_VALUE_NUM = :HV-CONTROL-VALUE-NUM\n    WHERE CONTROL_NAME = :HV-CONTROL-NAME\nEND-EXEC.\n", "input": {"HV-CONTROL-VALUE-NUM": "1001", "HV-CONTROL-NAME": "BANKZCUST987654                 "}, "expected": {"WS-CUSTOMER-NO-NUM": "0000001001", "COMM-NUMBER": "0000001001", "SQLCODE": "0"}}]}, "T3": {"name": "Customer Date of Birth Validation", "input_source": "DFHCOMMAREA", "input": {"COMM-DOB-DAY": "15", "COMM-DOB-MONTH": "03", "COMM-DOB-YEAR": "1985", "COMM-DOB": "15031985", "COMM-FAIL-CODE": " "}, "output": {"COMM-FAIL-CODE": " "}, "ret": {"COMM-FAIL-CODE": " "}, "tps": []}, "T4": {"name": "Customer Credit Score Assessment", "input_source": "DFHCOMMAREA (LINKAGE SECTION, COPY CRECUST)", "input": {"COMM-TITLE": "Mr        "}, "output": {"WS-CICS-RESP2": "0"}, "ret": {"WS-CICS-RESP": "0"}, "tps": [{"id": "CRECUST_OP_001", "type": "CICS", "lines": "687-692", "order": 1, "snippet": "EXEC CICS RUN TRANSID(WS-RUN-TRANSID)\nCHANNEL(WS-CHANNEL-NAME)\nCHILD(WS-ANY-CHILD-TKN)\nRESP(WS-CICS-RESP)\nRESP2(WS-CICS-RESP2)\nEND-EXEC\n", "input": {"WS-RUN-TRANSID": "OCR1", "WS-CHANNEL-NAME": "CIPCREDCHANN    "}, "expected": {"WS-CICS-RESP": "0", "WS-CICS-RESP2": "0"}}]}, "T5": {"name": "Customer Creation Audit Logging", "input_source": "DFHCOMMAREA (COPY CRECUST) plus SORTCODE (COPY SORTCODE), NCS-CUST-NO-VALUE, WS-CUSTOMER-NO-NUM and EIBTASKN", "input": {"COMM-SORTCODE": "987654", "COMM-NUMBER": "0000000000", "COMM-TITLE": "Mr        ", "COMM-FIRST-NAME": "John                                              ", "COMM-LAST-NAME": "Smith                                             ", "COMM-DOB-DAY": "15", "COMM-DOB-MONTH": "03", "COMM-DOB-YEAR": "1985", "COMM-PHONE": "01962 815000        ", "COMM-ADDR-LINE1": "12 High Street                                    ", "COMM-ADDR-LINE2": "Hursley                                           ", "COMM-CITY": "Winchester                                        ", "COMM-POSTCODE": "SO21 2JN  ", "COMM-COUNTRY": "United Kingdom                                    ", "COMM-STATUS": "ACTIVE    ", "COMM-CREATED-DAY": "01", "COMM-CREATED-MONTH": "06", "COMM-CREATED-YEAR": "2024", "COMM-CREDIT-SCORE": "750", "COMM-CS-REVIEW-DAY": "01", "COMM-CS-REVIEW-MONTH": "12", "COMM-CS-REVIEW-YEAR": "2024", "SORTCODE": "987654", "NCS-CUST-NO-VALUE": "0000000000000123", "WS-CUSTOMER-NO-NUM": "0000000123", "EIBTASKN": "12345"}, "output": {"COMM-SORTCODE": "987654", "COMM-NUMBER": "0000000123", "COMM-EYECATCHER": "CUST", "COMM-SUCCESS": "Y", "COMM-FAIL-CODE": " "}, "ret": {"SQLCODE": "0"}, "tps": [{"id": "CRECUST_OP_001", "type": "SQL", "lines": "1219-1256", "order": 1, "snippet": "EXEC SQL\nINSERT INTO CUSTOMER\n(CUSTOMER_EYECATCHER,\nCUSTOMER_SORTCODE,\nCUSTOMER_NUMBER,\nCUSTOMER_TITLE,\nCUSTOMER_FIRST_NAME,\nCUSTOMER_LAST_NAME,\nCUSTOMER_DATE_OF_BIRTH,\nCUSTOMER_PHONE,\nCUSTOMER_ADDR_LINE1,\nCUSTOMER_ADDR_LINE2,\nCUSTOMER_CITY,\nCUSTOMER_POSTCODE,\nCUSTOMER_COUNTRY,\nCUSTOMER_STATUS,\nCUSTOMER_CREATED_DATE,\nCUSTOMER_CREDIT_SCORE,\nCUSTOMER_CS_REVIEW_DATE)\nVALUES\n(:HV-CUSTOMER-EYECATCHER,\n:HV-CUSTOMER-SORTCODE,\n:HV-CUSTOMER-NUMBER,\n:HV-CUSTOMER-TITLE,\n:HV-CUSTOMER-FIRST-NAME,\n:HV-CUSTOMER-LAST-NAME,\n:HV-CUSTOMER-DOB,\n:HV-CUSTOMER-PHONE,\n:HV-CUSTOMER-ADDR-LINE1,\n:HV-CUSTOMER-ADDR-LINE2,\n:HV-CUSTOMER-CITY,\n:HV-CUSTOMER-POSTCODE,\n:HV-CUSTOMER-COUNTRY,\n:HV-CUSTOMER-STATUS,\n:HV-CUSTOMER-CREATE-DATE,\n:HV-CUSTOMER-CREDIT-SCORE,\n:HV-CUSTOMER-CS-REVIEW-DATE)\nEND-EXEC.\n", "input": {"HV-CUSTOMER-EYECATCHER": "CUST", "HV-CUSTOMER-SORTCODE": "987654", "HV-CUSTOMER-NUMBER": "0000000123", "HV-CUSTOMER-TITLE": "Mr        ", "HV-CUSTOMER-FIRST-NAME": "John                                              ", "HV-CUSTOMER-LAST-NAME": "Smith                                             ", "HV-CUSTOMER-DOB": "19850315", "HV-CUSTOMER-PHONE": "01962 815000        ", "HV-CUSTOMER-ADDR-LINE1": "12 High Street                                    ", "HV-CUSTOMER-ADDR-LINE2": "Hursley                                           ", "HV-CUSTOMER-CITY": "Winchester                                        ", "HV-CUSTOMER-POSTCODE": "SO21 2JN  ", "HV-CUSTOMER-COUNTRY": "United Kingdom                                    ", "HV-CUSTOMER-STATUS": "ACTIVE    ", "HV-CUSTOMER-CREATE-DATE": "20240601", "HV-CUSTOMER-CREDIT-SCORE": "750", "HV-CUSTOMER-CS-REVIEW-DATE": "20241201"}, "expected": {"SQLCODE": "0"}}, {"id": "CRECUST_OP_002", "type": "CICS", "lines": "1337-1339", "order": 2, "snippet": "EXEC CICS ASKTIME\nABSTIME(WS-U-TIME)\nEND-EXEC.\n", "input": {"EIBTASKN": "12345"}, "expected": {"WS-U-TIME": "000000000000000"}}, {"id": "CRECUST_OP_003", "type": "CICS", "lines": "1341-1346", "order": 3, "snippet": "EXEC CICS FORMATTIME\nABSTIME(WS-U-TIME)\nDDMMYYYY(WS-ORIG-DATE)\nTIME(HV-PROCTRAN-TIME)\nDATESEP('.')\nEND-EXEC.\n", "input": {"WS-U-TIME": "000000000000000"}, "expected": {"WS-ORIG-DATE": "15.06.2025", "HV-PROCTRAN-TIME": "143015"}}, {"id": "CRECUST_OP_004", "type": "SQL", "lines": "1359-1384", "order": 4, "snippet": "EXEC SQL\nINSERT INTO PROCTRAN\n(\nPROCTRAN_EYECATCHER,\nPROCTRAN_SORTCODE,\nPROCTRAN_NUMBER,\nPROCTRAN_DATE,\nPROCTRAN_TIME,\nPROCTRAN_REF,\nPROCTRAN_TYPE,\nPROCTRAN_DESC,\nPROCTRAN_AMOUNT\n)\nVALUES\n(\n:HV-PROCTRAN-EYECATCHER,\n:HV-PROCTRAN-SORT-CODE,\n:HV-PROCTRAN-ACC-NUMBER,\n:HV-PROCTRAN-DATE,\n:HV-PROCTRAN-TIME,\n:HV-PROCTRAN-REF,\n:HV-PROCTRAN-TYPE,\n:HV-PROCTRAN-DESC,\n:HV-PROCTRAN-AMOUNT\n)\nEND-EXEC.\n", "input": {"HV-PROCTRAN-EYECATCHER": "PRTR", "HV-PROCTRAN-SORT-CODE": "987654", "HV-PROCTRAN-ACC-NUMBER": "00000000", "HV-PROCTRAN-DATE": "15.06.2025", "HV-PROCTRAN-TIME": "143015", "HV-PROCTRAN-REF": "000000012345", "HV-PROCTRAN-TYPE": "OCC", "HV-PROCTRAN-DESC": "9876540000000123John Smith    15/03/1985", "HV-PROCTRAN-AMOUNT": "000000000000", "STORED-SORTCODE": "987654", "STORED-CUSTNO": "0000000123", "STORED-NAME": "John Smith                                                  ", "STORED-DOB": "15/03/1985"}, "expected": {"SQLCODE": "0"}}]}};
+const N = SRC.length;
+
+/* ---------- generic tree renderer (same as validate-agentic-business-rules.html) ---------- */
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+function makeTree(svg, data, o) {
+  const { boxW, boxH, gapX, levelH, padX, padTop, padBot } = o;
+  const leaves = [];
+  (function layout(node, depth, parents) {
+    node.depth = depth;
+    node.y = padTop + depth * levelH;
+    if (!node.children) {
+      node.leafIdx = [leaves.length];
+      node.cx = padX + boxW / 2 + leaves.length * (boxW + gapX);
+      node.path = [...parents, node];
+      leaves.push(node);
+      return;
+    }
+    node.children.forEach(c => layout(c, depth + 1, [...parents, node]));
+    node.leafIdx = node.children.flatMap(c => c.leafIdx);
+    node.cx = (node.children[0].cx + node.children[node.children.length - 1].cx) / 2;
+  })(data, 0, []);
+  const width = padX + leaves.length * (boxW + gapX) - gapX + 8;
+  const height = padTop + Math.max(...leaves.map(l => l.depth)) * levelH + boxH + padBot;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  o.levels.forEach(([a, b], d) => {
+    const y = padTop + d * levelH + boxH / 2;
+    el("text", { class: "lvl", x: 4, y: y - 1 }, svg).textContent = a;
+    el("text", { class: "lvl", x: 4, y: y + 10, "font-weight": 400 }, svg).textContent = b;
+  });
+  const slotX = (node, li) => {
+    const n = node.leafIdx.length, k = node.leafIdx.indexOf(li);
+    return node.cx - boxW / 2 + 8 + (boxW - 16) * (k + 0.5) / n;
+  };
+  const strandG = el("g", {}, svg), nodeG = el("g", {}, svg);
+  const strands = leaves.map((leaf, i) => {
+    const els = [];
+    for (let d = 0; d < leaf.path.length - 1; d++) {
+      const a = leaf.path[d], b = leaf.path[d + 1];
+      const x1 = slotX(a, i), y1 = a.y + boxH, x2 = slotX(b, i), y2 = b.y, my = (y1 + y2) / 2;
+      const dd = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+      els.push({ base: el("path", { class: "strand", d: dd }, strandG),
+                 flow: el("path", { class: "flow", d: dd }, strandG) });
+    }
+    return els;
+  });
+  const nodeEls = new Map();
+  (function draw(node) {
+    const isLeaf = !node.children;
+    const g = el("g", { class: "node" + (isLeaf ? " leaf" : "") }, nodeG);
+    const rect = el("rect", { x: node.cx - boxW / 2, y: node.y, width: boxW, height: boxH, rx: 5 }, g);
+    el("text", { class: "l1", x: node.cx, y: node.y + 15, "text-anchor": "middle" }, g).textContent = node.p;
+    el("text", { class: "l2", x: node.cx, y: node.y + 29, "text-anchor": "middle" }, g).textContent = node.c;
+    if (node.exit) el("rect", { x: node.cx - boxW / 2 + 5, y: node.y + boxH - 3, width: boxW - 10, height: 2, rx: 1, fill: "#e11d48" }, g);
+    const bd = el("g", { class: "badge" }, g);
+    const circle = el("circle", { cx: node.cx - boxW / 2, cy: node.y, r: 7 }, bd);
+    const num = el("text", { x: node.cx - boxW / 2, y: node.y + 3 }, bd);
+    num.textContent = node.depth + 1;
+    nodeEls.set(node, { g, rect, circle, num, bd });
+    if (isLeaf) g.addEventListener("click", () => o.onLeaf && o.onLeaf(node));
+    else node.children.forEach(draw);
+  })(data);
+  return { leaves, strands, nodeEls, width, height };
+}
+
+/* ---------- business-rule outcomes (one leaf = one branch of CRECUST.cbl) ----------
+   lines = source line ranges executed when this outcome is taken (verified against CRECUST.cbl) */
+const FETCHC = [[728, 758]];
+const NORMC  = [[964, 972]];
+const DOBH   = [[496, 497], [1555, 1559]];
+const LEAVES = [
+  { id: "tY", p: "WHEN valid title", c: "TITLE-VALID=Y", s: "title ok", d: "COMM-TITLE is one of Professor/Mr/Mrs/Miss/Ms/Dr/Drs/Lord/Sir/Lady/blank - continue, then ASKTIME/FORMATTIME (POPULATE-TIME-DATE)",
+    lines: [[413, 448], [453, 453], [457, 466], [522, 537]] },
+  { id: "tN", p: "WHEN OTHER", c: "FAIL 'T' RETURN", s: "title bad T", d: "Invalid title - COMM-SUCCESS='N', COMM-FAIL-CODE='T', GOBACK", lines: [[449, 457]], exit: 1 },
+
+  { id: "cPutOk", p: "THEN (NORMAL)", c: "PUT OK", s: "put ok", d: "PUT CONTAINER (CIPA..CIPE) RESP=NORMAL - issue RUN TRANSID OCRn, loop 5 times",
+    lines: [[471, 471], [604, 664]] },
+  { id: "cPutA", p: "ELSE", c: "FAIL 'A' RETURN", s: "put fail A", d: "PUT CONTAINER RESP not NORMAL - fail code 'A', return", lines: [[665, 682]], exit: 1 },
+  { id: "cRunOk", p: "THEN (NORMAL)", c: "RUN OK", s: "run ok", d: "RUN TRANSID OCRn RESP=NORMAL - store child channel/token, continue loop", lines: [[685, 694], [713, 726]] },
+  { id: "cRunB", p: "ELSE", c: "FAIL 'B' RETURN", s: "run fail B", d: "RUN TRANSID RESP not NORMAL - fail code 'B', return", lines: [[695, 711]], exit: 1 },
+
+  { id: "AVG", p: "REPLIES >= 1", c: "AVG CREDIT SCORE", s: "avg score", d: "At least one agency replied (COMPSTATUS NORMAL, GET CONTAINER ok); fetch loop ends on NOTFINISHED/52 or NOTFND/1 - average score and random review date within 21 days",
+    lines: [[473, 473], [494, 494], ...FETCHC, [767, 768], [798, 856], [889, 890], [907, 1017], [1045, 1054], [1127, 1135]] },
+  { id: "fNF0", p: "NOTFINISHED, 0 rpl", c: "FAIL 'C' RETURN", s: "nofin C", d: "FETCH ANY NOTFINISHED/52 with 0 replies - score 0, fail code 'C', return", lines: [[758, 758], [767, 797]], exit: 1 },
+  { id: "fNt0", p: "NOTFND, 0 replies", c: "FAIL 'G' RETURN", s: "notfnd G", d: "FETCH ANY NOTFND/1 with 0 replies - WS-CREDIT-CHECK-ERROR='Y', then fail code 'G' at line 473, return", lines: [[758, 758], [889, 906], [473, 494]], exit: 1 },
+  { id: "fInv", p: "INVREQ", c: "FAIL 'D' RETURN", s: "invreq D", d: "FETCH ANY INVREQ/1 (parent has no children) - fail code 'D', return", lines: [[758, 758], [861, 884]], exit: 1 },
+  { id: "fGetN", p: "GET CONTAINER bad", c: "FAIL 'E' RETURN", s: "getcont E", d: "FETCH ok but GET CONTAINER failed - fail code 'E', return", lines: [...FETCHC, [964, 1044]], exit: 1 },
+  { id: "fAbend", p: "COMPST = ABEND", c: "FAIL 'F' RETURN", s: "abend F", d: "Child completion status ABEND - fail code 'F', return", lines: [...FETCHC, ...NORMC, [1055, 1072]], exit: 1 },
+  { id: "fSec", p: "COMPST = SECERROR", c: "FAIL 'G' RETURN", s: "secerr G", d: "Child completion status SECERROR - fail code 'G', return", lines: [...FETCHC, ...NORMC, [1074, 1099]], exit: 1 },
+  { id: "fOth", p: "COMPST = OTHER", c: "FAIL 'H' RETURN", s: "other H", d: "Unknown completion status - fail code 'H', return", lines: [...FETCHC, ...NORMC, [1101, 1126]], exit: 1 },
+
+  { id: "dOk", p: "ALL CHECKS PASS", c: "CONTINUE", s: "dob ok", d: "Year >= 1601, CEEDAYS and CEELOCT succeed, age <= 150, DOB not in future - WS-DATE-OF-BIRTH-ERROR stays 'N'",
+    lines: [...DOBH, [498, 498], [503, 503], [1560, 1560], [1564, 1575], [1583, 1590], [1595, 1600], [1604, 1606], [1609, 1612]] },
+  { id: "dYear", p: "YEAR < 1601", c: "FAIL 'O' RETURN", s: "dob<1601 O", d: "DOB year before 1601 - error flag, fail code 'O', return", lines: [...DOBH, [1560, 1563], [498, 503], [1611, 1612]], exit: 1 },
+  { id: "dCee", p: "CEEDAYS NOT 0", c: "FAIL 'Z' RETURN", s: "ceedays Z", d: "CEEDAYS rejects the date (e.g. 31/02) - fail code 'Z', return", lines: [...DOBH, [1566, 1582], [498, 503]], exit: 1 },
+  { id: "dLoc", p: "CEELOCT NOT 0", c: "ERR=Y RETURN", s: "ceeloct err", d: "CEELOCT (today) fails - error flag set (no fail code), return", lines: [...DOBH, [1585, 1594], [498, 503]], exit: 1 },
+  { id: "dAge", p: "AGE > 150", c: "FAIL 'O' RETURN", s: "age>150 O", d: "Customer older than 150 years - fail code 'O', return", lines: [...DOBH, [1597, 1603], [498, 503]], exit: 1 },
+  { id: "dFut", p: "DOB IN FUTURE", c: "FAIL 'Y' RETURN", s: "future Y", d: "Today's Lilian date earlier than DOB - fail code 'Y', return", lines: [...DOBH, [1606, 1609], [498, 503]], exit: 1 },
+
+  { id: "enqOk", p: "THEN (NORMAL)", c: "ENQ OK", s: "enq ok", d: "ENQ on BANKZCUST+sortcode RESP=NORMAL - continue", lines: [[508, 508], [540, 552], [556, 559]] },
+  { id: "enqN", p: "ELSE", c: "FAIL '3' RETURN", s: "enq fail 3", d: "ENQ RESP not NORMAL - fail code '3', return", lines: [[540, 555]], exit: 1 },
+
+  { id: "selOk", p: "THEN SQLCODE=0", c: "SELECT OK", s: "select ok", d: "SELECT CONTROL_VALUE_NUM succeeded - continue", lines: [[513, 513], [587, 594], [1476, 1503], [1514, 1519]] },
+  { id: "selN", p: "ELSE", c: "FAIL '4' +DEQ", s: "select fail 4", d: "SELECT CONTROL failed - fail code '4', DEQ, return", lines: [[1503, 1513]], exit: 1 },
+  { id: "updOk", p: "THEN SQLCODE=0", c: "UPDATE OK", s: "update ok", d: "Control value + 1 written back; COMM-NUMBER / WS-CUSTOMER-NO-NUM set", lines: [[596, 599], [1519, 1530], [1538, 1552]] },
+  { id: "updN", p: "ELSE", c: "FAIL '4' +DEQ", s: "update fail 4", d: "UPDATE CONTROL failed - fail code '4', DEQ, return", lines: [[1530, 1537]], exit: 1 },
+
+  { id: "insOk", p: "THEN SQLCODE=0", c: "INSERT OK", s: "insert ok", d: "INSERT INTO CUSTOMER succeeded - build PROCTRAN description", lines: [[518, 518], [1138, 1261], [1269, 1293]] },
+  { id: "insN", p: "ELSE", c: "FAIL '1' +DEQ", s: "insert fail 1", d: "INSERT CUSTOMER failed - fail code '1', DEQ, return", lines: [[1261, 1268]], exit: 1 },
+
+  { id: "procOk", p: "THEN SQLCODE=0", c: "PROCTRAN OK", s: "proctran ok", d: "INSERT INTO PROCTRAN (type OCC, amount 0) succeeded", lines: [[1293, 1293], [1312, 1316], [1320, 1388], [1458, 1461]] },
+  { id: "procN", p: "ELSE", c: "ABEND 'HWPT'", s: "proctran ABEND", d: "INSERT PROCTRAN failed - link ABNDPROC, DEQ, ABEND 'HWPT'", lines: [[1389, 1457]], exit: 1 },
+
+  { id: "deqOk", p: "THEN (NORMAL)", c: "SUCCESS 'Y'", s: "deq ok, success", d: "DEQ RESP=NORMAL - COMM-SORTCODE/NUMBER/EYECATCHER set, COMM-SUCCESS='Y', fail code blank, return",
+    lines: [[520, 520], [562, 577], [581, 584], [1295, 1295], [1297, 1309], [1464, 1473]] },
+  { id: "deqN", p: "ELSE", c: "FAIL '5' RETURN", s: "deq fail 5", d: "DEQ RESP not NORMAL - fail code '5', return", lines: [[562, 580], [1295, 1295]], exit: 1 }
+];
+LEAVES.forEach((l, i) => { l.br = "BR-" + String(i + 1).padStart(2, "0"); l.exit = !!l.exit; });
+const D = Object.fromEntries(LEAVES.map(l => [l.id, l]));
+const ORDER = LEAVES.map(l => l.id);
+
+/* decision groups in execution order */
+const G = {
+  title: ["tY", "tN"], put: ["cPutOk", "cPutA"], run: ["cRunOk", "cRunB"],
+  fetch: ["AVG", "fNF0", "fNt0", "fInv", "fGetN", "fAbend", "fSec", "fOth"],
+  dob: ["dOk", "dYear", "dCee", "dLoc", "dAge", "dFut"], enq: ["enqOk", "enqN"],
+  sel: ["selOk", "selN"], upd: ["updOk", "updN"], ins: ["insOk", "insN"], proc: ["procOk", "procN"], deq: ["deqOk", "deqN"]
+};
+const GORDER = Object.keys(G);
+
+const leafNode = id => ({ id, p: D[id].p, c: D[id].c, exit: D[id].exit });
+const cond = (p, c, g) => ({ p, c, children: G[g].map(leafNode) });
+const tree = {
+  p: "PROGRAM", c: "CRECUST",
+  children: [
+    { p: "TITLE CHECK", c: "P010", children: [cond("EVALUATE", "COMM-TITLE", "title")] },
+    { p: "CREDIT CHECK", c: "CC010", children: [cond("IF", "PUT CONTAINER", "put"), cond("IF", "RUN TRANSID", "run"), cond("EVALUATE", "FETCH ANY reply", "fetch")] },
+    { p: "DOB CHECK", c: "DOBC010", children: [cond("EVALUATE", "first failing chk", "dob")] },
+    { p: "ENQ COUNTER", c: "ENC010", children: [cond("IF", "ENQ RESP", "enq")] },
+    { p: "NEXT CUST NO", c: "GLCD010", children: [cond("IF", "SELECT SQLCODE", "sel"), cond("IF", "UPDATE SQLCODE", "upd")] },
+    { p: "WRITE CUSTOMER", c: "WCD010", children: [cond("IF", "INSERT SQLCODE", "ins")] },
+    { p: "WRITE PROCTRAN", c: "WPD010", children: [cond("IF", "INSERT SQLCODE", "proc")] },
+    { p: "DEQ COUNTER", c: "DNC010", children: [cond("IF", "DEQ RESP", "deq")] }
+  ]
+};
+
+/* ---------- functionalities = one test-data file each ----------
+   leaves: outcome -> evidence from the YAML. Evidence starting with "implied" means the YAML does not list the
+   operation as an io_testpoint but the scenario cannot reach its expected result without taking that branch. */
+const FUNCS = [
+  { k: "T1", n: "New Customer Record Creation", color: "#2563eb", type: "End-to-end happy path", file: "CRECUST_new-customer-record-creation_test_data.yaml",
+    scope: GORDER,
+    leaves: {
+      tY: "input COMM-TITLE='Mr'", cPutOk: "implied: OP_003 RUN is only reached after PUT CONTAINER succeeds", cRunOk: "OP_003 RUN TRANSID(OCR1) RESP=0",
+      AVG: "implied: header says 'at least one credit agency replies'; which terminator (NOTFINISHED/NOTFND) is not stated",
+      dOk: "input DOB 15/06/1985 is valid (CEEDAYS/CEELOCT not emitted as testpoints)", enqOk: "implied: ENQ is not a testpoint but OP_004 only runs after it succeeds",
+      selOk: "OP_004 SELECT CONTROL SQLCODE=0", updOk: "OP_005 UPDATE CONTROL SQLCODE=0", insOk: "OP_006 INSERT CUSTOMER SQLCODE=0",
+      procOk: "OP_009 INSERT PROCTRAN SQLCODE=0", deqOk: "implied: expected COMM-SUCCESS='Y' after DEQ" } },
+  { k: "T2", n: "Unique Customer Number Allocation", color: "#9333ea", type: "Slice (ENQ + CONTROL table)", file: "CRECUST_unique-customer-number-allocation_test_data.yaml",
+    scope: ["enq", "sel", "upd"],
+    leaves: { enqOk: "OP_001 ENQ RESP=0", selOk: "OP_002 SELECT CONTROL value 1000, SQLCODE=0", updOk: "OP_003 UPDATE CONTROL value 1001, SQLCODE=0" } },
+  { k: "T3", n: "Customer Date of Birth Validation", color: "#ea580c", type: "Slice (valid DOB only)", file: "CRECUST_customer-date-of-birth-validation_test_data.yaml",
+    scope: ["dob"],
+    leaves: { dOk: "input DOB 15/03/1985, expected COMM-FAIL-CODE=' ' (no io_testpoints: CEEDAYS/CEELOCT are non-deterministic)" } },
+  { k: "T4", n: "Customer Credit Score Assessment", color: "#0891b2", type: "Slice (first RUN TRANSID only)", file: "CRECUST_customer-credit-score-assessment_test_data.yaml",
+    scope: ["put", "run", "fetch"],
+    leaves: { tY: "input COMM-TITLE='Mr'", cPutOk: "implied: RUN TRANSID only reached after PUT CONTAINER succeeds", cRunOk: "OP_001 RUN TRANSID(OCR1) RESP=0" } },
+  { k: "T5", n: "Customer Creation Audit Logging", color: "#db2777", type: "Slice (INSERTs + PROCTRAN)", file: "CRECUST_customer-creation-audit-logging_test_data.yaml",
+    scope: ["ins", "proc", "deq"],
+    leaves: { insOk: "OP_001 INSERT CUSTOMER SQLCODE=0", procOk: "OP_004 INSERT PROCTRAN SQLCODE=0", deqOk: "implied: expected COMM-SUCCESS='Y' after DEQ" } }
+];
+const FBY = Object.fromEntries(FUNCS.map(f => [f.k, f]));
+FUNCS.forEach(f => { f.set = new Set(Object.keys(f.leaves)); f.scopeLeaves = f.scope.flatMap(g => G[g]); f.tests = TESTS[f.k]; });
+
+/* ---------- coverage maths ---------- */
+const coveredLeaf = new Set(FUNCS.flatMap(f => [...f.set]));
+const testsOf = id => FUNCS.filter(f => f.set.has(id));
+function enumPaths(groups) {
+  const out = [];
+  (function walk(i, acc) {
+    if (i === groups.length) { out.push(acc); return; }
+    groups[i].forEach(id => { const n = [...acc, id]; if (D[id].exit) out.push(n); else walk(i + 1, n); });
+  })(0, []);
+  return out;
+}
+const mkPaths = (groups, prefix) => enumPaths(groups).map((ids, i) => {
+  const test = FUNCS.find(f => ids.every(x => f.set.has(x))) || null;
+  return { k: prefix + String(i + 1).padStart(2, "0"), ids, test };
+});
+const GP = mkPaths(GORDER.map(g => G[g]), "P");
+const FP = Object.fromEntries(FUNCS.map(f => [f.k, mkPaths(f.scope.map(g => G[g]), f.k + ".S")]));
+const pathsFor = fk => fk ? FP[fk] : GP;
+const pathText = ids => ids.map(i => D[i].s).join(" &rarr; ");
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const sortIds = ids => [...ids].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+const col = v => v >= 90 ? "#16a34a" : v >= 70 ? "#d97706" : "#e11d48";
+
+/* ---------- source line index ---------- */
+const LL = {}, lineLeaves = Array.from({ length: N + 2 }, () => []), firstOf = Array.from({ length: N + 2 }, () => []);
+LEAVES.forEach(l => {
+  const nums = new Set();
+  l.lines.forEach(([a, b]) => { for (let n = a; n <= b; n++) nums.add(n); });
+  LL[l.id] = [...nums].sort((a, b) => a - b);
+  LL[l.id].forEach(n => lineLeaves[n].push(l.id));
+  firstOf[Math.min(...nums)].push(l.id);
+});
+
+/* ---------- tree ---------- */
+const svgT = document.getElementById("svgT");
+const TB = makeTree(svgT, tree, {
+  boxW: 108, boxH: 38, gapX: 6, levelH: 88, padX: 70, padTop: 14, padBot: 10,
+  levels: [["Level 1", "program"], ["Level 2", "section"], ["Level 3", "condition"], ["Level 4", "outcome"]],
+  onLeaf: node => pickLeaf(node.id)
+});
+svgT.style.width = TB.width + "px";
+const idxT = {}; TB.leaves.forEach((l, i) => idxT[l.id] = i);
+const covClass = n => {
+  const ids = n.leafIdx.map(i => TB.leaves[i].id), hit = ids.filter(i => coveredLeaf.has(i)).length;
+  return hit === ids.length ? "cov-ok" : hit === 0 ? "cov-gap" : "cov-part";
+};
+
+/* ---------- code view ---------- */
+const codeDiv = document.getElementById("code");
+const lineEls = [];
+SRC.forEach((t, i) => {
+  const n = i + 1, d = document.createElement("div");
+  d.innerHTML = `<span class="no">${n}</span><span class="st"><i></i></span><span class="tx"></span><span class="meta"></span>`;
+  d.querySelector(".tx").textContent = t;
+  codeDiv.appendChild(d);
+  lineEls[n] = { d, st: d.querySelector(".st i"), meta: d.querySelector(".meta"), cmt: /^.{6}[*D]/.test(t) || /^\s*$/.test(t) };
+});
+document.getElementById("codeLg").innerHTML =
+  `<span class="lg"><i style="background:#16a34a"></i>covered by test data<i style="background:#e11d48"></i>no test data reaches it<i style="background:#fde68a"></i>selected test point</span>`;
+
+let lastPaint = null;
+function paintCode(mode, ids, color, gap, tp) {
+  lastPaint = [mode, ids, color, gap];
+  const inP = new Uint8Array(N + 2), inG = new Uint8Array(N + 2);
+  ids.forEach(id => LL[id].forEach(n => inP[n] = 1));
+  gap.forEach(id => LL[id].forEach(n => { if (!inP[n]) inG[n] = 1; }));
+  let step = 0, first = null;
+  for (let n = 1; n <= N; n++) {
+    const e = lineEls[n], d = e.d;
+    d.className = "cl" + (e.cmt ? " cmt" : "");
+    d.style.background = ""; d.style.borderLeftColor = ""; e.st.textContent = ""; e.st.style.background = "";
+    let meta = "";
+    if (mode === "ov") {
+      if (lineLeaves[n].length) {
+        const cv = lineLeaves[n].some(id => coveredLeaf.has(id));
+        d.classList.add(cv ? "c-ok" : "c-gap");
+        firstOf[n].forEach(id => { meta += `<span>${D[id].br}</span>`; if (!coveredLeaf.has(id)) meta += `<span style="background:#e11d48;color:#fff">NOT COVERED</span>`; });
+      }
+    } else if (inP[n]) {
+      d.classList.add("sel");
+      d.style.background = color + "26"; d.style.borderLeftColor = color;
+      if (!e.cmt) { e.st.textContent = ++step; e.st.style.background = color; }
+      if (!first) first = d;
+      firstOf[n].filter(id => ids.includes(id)).forEach(id => meta += `<span>${D[id].br}</span>`);
+    } else if (inG[n]) {
+      d.classList.add("g-gap");
+      if (!first) first = d;
+      firstOf[n].filter(id => gap.has(id)).forEach(id => meta += `<span>${D[id].br}</span><span style="background:#e11d48;color:#fff">NOT COVERED</span>`);
+    } else d.classList.add("skip");
+    e.meta.innerHTML = meta;
+  }
+  if (tp) { for (let n = tp[0]; n <= tp[1]; n++) lineEls[n].d.classList.add("tp"); first = lineEls[tp[0]].d; }
+  codeDiv.scrollTop = first ? Math.max(0, first.offsetTop - 6) : 0;
+}
+
+/* ---------- chips ---------- */
+const chipsDiv = document.getElementById("chips"), chipEls = {};
+function addChip(label, key, color, cls) {
+  const b = document.createElement("button");
+  b.textContent = label; b.style.setProperty("--c", color);
+  if (cls) b.className = cls;
+  b.addEventListener("click", () => select(key === "__ov__" || chipEls[key].classList.contains("active") ? { t: "ov" } : { t: "f", k: key }));
+  chipsDiv.appendChild(b); chipEls[key] = b;
+}
+addChip("Coverage overview", "__ov__", "#374151", "all");
+FUNCS.forEach(f => addChip(f.n, f.k, f.color));
+
+/* ---------- panels ---------- */
+const kv = o => `<table class="kv">` + Object.entries(o || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>"${esc(v)}"</td></tr>`).join("") + `</table>`;
+let curTP = null;
+function renderTests(fk) {
+  const body = document.getElementById("tpBody"), title = document.getElementById("tpTitle");
+  if (!fk) {
+    title.textContent = "Test data supplied (5 functionalities)";
+    body.innerHTML = `<table class="br"><tr><th>Id</th><th>Functionality</th><th>Test points</th><th>Outcomes hit</th><th>Scope coverage</th></tr>` +
+      FUNCS.map(f => {
+        const sc = f.scopeLeaves.filter(i => coveredLeaf.has(i)).length;
+        return `<tr data-f="${f.k}"><td class="id" style="color:${f.color}">${f.k}</td><td>${f.n}<div style="color:#57606a;font-size:10.5px">${f.type}</div></td>` +
+          `<td>${f.tests.tps.length}</td><td>${f.set.size}</td><td>${sc}/${f.scopeLeaves.length} (${pct(sc, f.scopeLeaves.length)}%)</td></tr>`;
+      }).join("") + `</table>` +
+      `<div class="note">Click a row or a chip to see its path, code lines and test points. Every YAML models the successful scenario only &ndash; no test data exercises a failure outcome.</div>`;
+    return;
+  }
+  const f = FBY[fk], t = f.tests;
+  title.textContent = `${f.k} test data - ${t.name} (${t.tps.length} test point${t.tps.length === 1 ? "" : "s"})`;
+  body.innerHTML = `<div class="note"><b>${esc(f.file)}</b><br>Click a test point to highlight its source lines.</div>` +
+    `<div class="tpbox"><div class="h">program_input <em>${esc(t.input_source || "")}</em></div>${kv(t.input)}<div class="sec">program_expected_output</div>${kv(t.output)}${t.ret && Object.keys(t.ret).length ? `<div class="sec">return_codes</div>${kv(t.ret)}` : ""}</div>` +
+    (t.tps.length ? t.tps.map(tp => `<div class="tpbox${curTP === tp.id ? " active" : ""}" data-tp="${tp.id}" data-lines="${tp.lines}">` +
+      `<div class="h">${tp.id.replace("CRECUST_", "")} <em>${tp.type} &middot; L${tp.lines} &middot; exec #${tp.order}</em></div>` +
+      `<pre>${esc(tp.snippet.split("\n").slice(0, 2).join("\n"))}</pre>` +
+      `<div class="sec">input</div>${kv(tp.input)}<div class="sec">expected</div>${kv(tp.expected)}</div>`).join("")
+      : `<div class="note">No io_testpoints in this file (the only calls are non-deterministic CEEDAYS/CEELOCT).</div>`);
+}
+
+function renderBR(fk) {
+  const ids = fk ? FBY[fk].scopeLeaves : ORDER;
+  document.getElementById("brTitle").textContent = `Business-rule outcomes (${ids.filter(i => coveredLeaf.has(i)).length}/${ids.length} covered)`;
+  document.getElementById("brTable").innerHTML =
+    `<table class="br"><tr><th>Rule</th><th>Outcome</th><th>Business rule</th><th>Covered by</th></tr>` +
+    ids.map(id => {
+      const ts = testsOf(id);
+      return `<tr data-leaf="${id}"><td class="id">${D[id].br}</td><td class="id">${esc(D[id].p)}<div style="font-weight:400;color:#57606a">${esc(D[id].c)}</div></td><td>${esc(D[id].d)}</td><td>` +
+        (ts.length ? ts.map(f => { const ev = f.leaves[id]; return `<span class="pill ${ev.startsWith("implied") ? "imp" : "ok"}" title="${esc(f.k + ": " + ev)}">${f.k}</span>`; }).join("") : `<span class="pill gap">NOT COVERED</span>`) + `</td></tr>`;
+    }).join("") + `</table>`;
+}
+
+function renderPaths(fk, curKey) {
+  const ps = pathsFor(fk), cov = ps.filter(p => p.test), gap = ps.filter(p => !p.test);
+  document.getElementById("gapTitle").textContent = `${fk ? FBY[fk].k + " scope" : "End-to-end"} paths: ${cov.length} covered, ${gap.length} uncovered`;
+  document.getElementById("gaps").innerHTML =
+    gap.map(p => `<div data-p="${p.k}"><b style="color:#e11d48">${p.k} &#10007;</b> ${pathText(p.ids)}</div>`).join("") +
+    cov.map(p => `<div data-p="${p.k}" style="color:#4b5563"><b style="color:#16a34a">${p.k} &#10003;</b> ${pathText(p.ids)} <span class="pill ok">${p.test.k}</span></div>`).join("");
+  document.querySelectorAll("#gaps [data-p]").forEach(d => d.classList.toggle("active", d.dataset.p === curKey));
+}
+
+function renderKPI(fk) {
+  const leafIds = fk ? FBY[fk].scopeLeaves : ORDER, ps = pathsFor(fk);
+  const cl = leafIds.filter(i => coveredLeaf.has(i)).length, bp = pct(cl, leafIds.length);
+  const cp = ps.filter(p => p.test).length, pp = pct(cp, ps.length);
+  const card = (v, k, bar, color) => `<div class="card"><div class="v" style="color:${color || "#1f2328"}">${v}</div><div class="k">${k}</div>` +
+    (bar != null ? `<div class="bar"><i style="width:${bar}%;background:${col(bar)}"></i></div>` : "") + `</div>`;
+  const tps = fk ? FBY[fk].tests.tps.length : FUNCS.reduce((a, f) => a + f.tests.tps.length, 0);
+  document.getElementById("kpi").innerHTML =
+    card(leafIds.length, fk ? "Outcomes in scope" : "Business-rule outcomes") +
+    card(`${cl}/${leafIds.length} &nbsp;${bp}%`, "Branch coverage", bp, col(bp)) +
+    card(`${cp}/${ps.length} &nbsp;${pp}%`, "Path coverage", pp, col(pp)) +
+    card(fk ? 1 : FUNCS.length, fk ? "Test-data file" : "Test-data files") +
+    card(tps, "Test points") +
+    card(ps.length - cp, "Uncovered paths", null, "#e11d48") +
+    `<div class="card" style="flex:1 1 280px;font-size:11.5px;color:#374151;align-self:stretch"><b>Reading this:</b> ` +
+    (fk ? `${FBY[fk].n} owns ${leafIds.length} outcomes; test data reaches ${cl}. The ${leafIds.length - cl} uncovered ones are the failure branches shown as red dashed boxes.`
+        : `all five YAMLs describe the successful scenario, so ${ORDER.length - coveredLeaf.size} of ${ORDER.length} outcomes (every error exit) and ${GP.length - cp} of ${GP.length} end-to-end paths have no test data.`) + `</div>`;
+}
+
+/* ---------- selection ---------- */
+const info = document.getElementById("info");
+let cur = { t: "ov" };
+function select(sel) {
+  cur = sel; curTP = null;
+  const fk = sel.t === "f" ? sel.k : sel.t === "p" ? sel.fk : null;
+  const F = fk ? FBY[fk] : null;
+  const P = sel.t === "p" ? pathsFor(fk).find(p => p.k === sel.key) : null;
+  let ids = [], color = "#374151", gap = new Set();
+  if (sel.t === "f") { ids = sortIds(F.set); color = F.color; gap = new Set(F.scopeLeaves.filter(i => !coveredLeaf.has(i))); }
+  if (P) { ids = P.ids; color = P.test ? "#16a34a" : "#e11d48"; }
+  const ov = sel.t === "ov";
+  const on = new Set(ids.map(i => idxT[i])), gapIdx = new Set([...gap].map(i => idxT[i]));
+  svgT.classList.toggle("dim", !ov);
+
+  TB.strands.forEach((segs, i) => segs.forEach(s => {
+    const hl = on.has(i), isGap = gapIdx.has(i), cv = coveredLeaf.has(TB.leaves[i].id);
+    s.base.classList.toggle("on", hl); s.flow.classList.toggle("on", hl); s.base.classList.toggle("gapS", isGap);
+    s.base.style.filter = hl ? `drop-shadow(0 0 3px ${color})` : "";
+    s.base.style.opacity = isGap ? "1" : "";
+    if (ov) { s.base.style.stroke = cv ? "#16a34a" : "#e11d48"; s.base.style.strokeWidth = "2.5"; s.base.style.strokeDasharray = cv ? "" : "5 4"; }
+    else if (hl) { s.base.style.stroke = color; s.base.style.strokeWidth = ""; s.base.style.strokeDasharray = ""; }
+    else if (isGap) { s.base.style.stroke = "#e11d48"; s.base.style.strokeWidth = "2.5"; s.base.style.strokeDasharray = "5 4"; }
+    else { s.base.style.stroke = ""; s.base.style.strokeWidth = ""; s.base.style.strokeDasharray = ""; }
+    if (hl) { s.base.parentNode.appendChild(s.base); s.base.parentNode.appendChild(s.flow); }
+  }));
+
+  const nodeColor = new Map(), nodeNo = new Map(), gapNodes = new Set();
+  let n = 0;
+  ids.forEach(id => TB.leaves[idxT[id]].path.forEach(nd => { if (!nodeNo.has(nd)) nodeNo.set(nd, ++n); nodeColor.set(nd, color); }));
+  gap.forEach(id => TB.leaves[idxT[id]].path.forEach(nd => gapNodes.add(nd)));
+  TB.nodeEls.forEach((e, nd) => {
+    const c = nodeColor.get(nd);
+    e.g.classList.toggle("on", !!c);
+    e.g.classList.toggle("ingap", gapNodes.has(nd));
+    e.rect.style.fill = c || ""; e.rect.style.stroke = c || "";
+    e.rect.style.filter = c ? `drop-shadow(0 2px 4px ${c}88)` : "";
+    e.circle.style.stroke = c || ""; e.num.style.fill = c || "";
+    e.num.textContent = nodeNo.get(nd) || "";
+    e.g.classList.remove("cov-ok", "cov-gap", "cov-part");
+    if (ov) e.g.classList.add(covClass(nd));
+    else if (!c && !nd.children && gap.has(nd.id)) e.g.classList.add("cov-gap");
+  });
+
+  paintCode(ov ? "ov" : "sel", ids, color, gap);
+  Object.entries(chipEls).forEach(([k, b]) => b.classList.toggle("active", k === (fk || "__ov__")));
+  renderKPI(fk); renderTests(fk); renderBR(fk); renderPaths(fk, P && P.k);
+
+  if (sel.t === "f") {
+    info.style.borderLeftColor = color; info.style.background = color + "1f";
+    info.innerHTML = `<b style="color:${color}">${F.k} &ndash; ${F.n}</b><span class="tag" style="background:${color}">${F.type}</span>` +
+      `<div>path covered by test data: ${pathText(ids)}</div><div>rules: ${ids.map(i => D[i].br).join(", ")}</div>` +
+      `<div style="color:#9f1239">not covered in this functionality (${gap.size}): ${[...gap].map(i => D[i].br + " " + D[i].s).join(" | ") || "none"}</div>`;
+  } else if (P) {
+    info.style.borderLeftColor = color; info.style.background = color + "1f";
+    info.innerHTML = `<b style="color:${color}">${P.k} &ndash; ${P.test ? "covered path" : "uncovered path"}</b>` +
+      `<span class="tag" style="background:${color}">${P.test ? "COVERED BY " + P.test.k : "NO TEST DATA"}</span>` +
+      `<div>path: ${pathText(P.ids)}</div><div>rules: ${P.ids.map(i => D[i].br).join(", ")}</div>` +
+      `<div>${P.test ? "Test data: " + P.test.n : "No test data drives this combination &ndash; add a scenario for it."}</div>`;
+  } else {
+    info.style.borderLeftColor = "#374151"; info.style.background = "#eef0f3";
+    info.innerHTML = `<b>Coverage overview</b> green = outcome reached by test data &middot; red dashed = never exercised &middot; amber = partly covered. ` +
+      `Pick a functionality above, an outcome box, or a path on the right.`;
+  }
+}
+
+/* an outcome click shows a path through it: a covered path for covered leaves, otherwise an uncovered path */
+function pickLeaf(id) {
+  const fk = cur.t === "f" ? cur.k : cur.t === "p" ? cur.fk : null;
+  let ps = pathsFor(fk);
+  if (fk && !FBY[fk].scopeLeaves.includes(id)) { ps = GP; }
+  const want = coveredLeaf.has(id);
+  const p = ps.find(p => p.ids.includes(id) && !!p.test === want) || ps.find(p => p.ids.includes(id));
+  if (p) select({ t: "p", key: p.k, fk: ps === GP ? null : fk });
+}
+
+document.getElementById("gaps").addEventListener("click", e => {
+  const t = e.target.closest("[data-p]"); if (!t) return;
+  const fk = cur.t === "f" ? cur.k : cur.t === "p" ? cur.fk : null;
+  select({ t: "p", key: t.dataset.p, fk });
+});
+document.getElementById("brTable").addEventListener("click", e => { const t = e.target.closest("[data-leaf]"); if (t) pickLeaf(t.dataset.leaf); });
+document.getElementById("tpBody").addEventListener("click", e => {
+  const r = e.target.closest("[data-f]"); if (r) { select({ t: "f", k: r.dataset.f }); return; }
+  const b = e.target.closest("[data-tp]"); if (!b) return;
+  const [a, z] = b.dataset.lines.split("-").map(Number);
+  const same = curTP === b.dataset.tp;
+  const keep = lastPaint;
+  select(cur);                              /* repaint without any test-point highlight */
+  if (!same) {
+    curTP = b.dataset.tp;
+    paintCode(keep[0], keep[1], keep[2], keep[3], [a, z || a]);
+    document.querySelectorAll("#tpBody [data-tp]").forEach(x => x.classList.toggle("active", x.dataset.tp === curTP));
+  }
+});
+
+select({ t: "ov" });
+</script>
+<div style="margin:0 16px;font-size:11px;color:#9aa1ab">Generated from CRECUST.cbl and the five CRECUST_*_test_data.yaml files.</div>
+</body>
+</html>
