@@ -1,2 +1,4 @@
 # Bob Z Extension - Local settings and generated files
 .bobz/
+
+node_modules/
